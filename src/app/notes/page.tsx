@@ -20,7 +20,7 @@ export default function Page() {
       {/* Header */}
       <header className="max-w-5xl mx-auto p-10 text-center">
         <h1 className="text-5xl font-extrabold text-royal-blue dark:text-royal-blue mb-4 drop-shadow-sm tracking-tight select-none">
-          Welcome to NoteMaster
+          Welcome to NoteVerse
         </h1>
         <p className="text-xl font-medium text-slate-gray dark:text-slate-gray/80 max-w-2xl mx-auto">
           Choose your preferred note-taking mode — canvas for freeform ideas or notebook for structured writing.
