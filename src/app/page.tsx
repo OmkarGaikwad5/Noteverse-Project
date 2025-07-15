@@ -18,7 +18,7 @@ export default function Home() {
         </p>
         <div className="mt-10 items-center flex flex-col sm:flex-row gap-4 justify-center">
           <Link
-            href="/notes"
+            href="/home"
             className="bg-primary text-primary-foreground px-6 py-3 rounded-lg font-semibold hover:bg-primary/90 transition shadow-lg"
           >
             Launch App

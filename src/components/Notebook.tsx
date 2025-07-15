@@ -1,27 +1,30 @@
 'use client';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
-export default function Notebook() {
+export default function Notebook({ noteId }: { noteId: string }) {
+    const storageKey = `notebookLines-${noteId}`;
     const [pageIndex, setPageIndex] = useState(0);
-    const [pages, setPages] = useState<string[][]>([[]]);
+    const [pages, setPages] = useState<string[][]>(() => {
+        // ✅ Load once from localStorage on initial render
+        if (typeof window !== 'undefined') {
+            const saved = localStorage.getItem(storageKey);
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved);
+                    if (Array.isArray(parsed)) return parsed;
+                } catch (e) {
+                    console.error('❌ Failed to parse saved notebook:', e);
+                }
+            }
+        }
+        return [['']]; // default: 1 page with 1 empty line
+    });
     const [mode, setMode] = useState<'line' | 'full'>('line');
     const lineInputRefs = useRef<(HTMLTextAreaElement | null)[]>([]);
 
     useEffect(() => {
-        const saved = localStorage.getItem('notebookLines');
-        if (saved) {
-            try {
-                const parsed = JSON.parse(saved);
-                setPages(parsed);
-            } catch (e) {
-                console.error("Failed to load notebook from local storage", e);
-            }
-        }
-    }, []);
-
-    useEffect(() => {
-        localStorage.setItem('notebookLines', JSON.stringify(pages));
-    }, [pages]);
+        localStorage.setItem(storageKey, JSON.stringify(pages));
+    }, [pages, storageKey]);
 
     const handleLineChange = (lineIndex: number, text: string) => {
         const updated = [...pages];
@@ -89,8 +92,8 @@ export default function Notebook() {
                         type="button"
                         onClick={() => setMode('line')}
                         className={`px-4 py-1 text-sm font-semibold transition ${mode === 'line'
-                                ? 'bg-royal-blue text-white'
-                                : 'bg-card text-foreground hover:bg-muted'
+                            ? 'bg-royal-blue text-white'
+                            : 'bg-card text-foreground hover:bg-muted'
                             }`}
                     >
                         Line Mode
@@ -99,8 +102,8 @@ export default function Notebook() {
                         type="button"
                         onClick={() => setMode('full')}
                         className={`px-4 py-1 text-sm font-semibold transition ${mode === 'full'
-                                ? 'bg-royal-blue text-white'
-                                : 'bg-card text-foreground hover:bg-muted'
+                            ? 'bg-royal-blue text-white'
+                            : 'bg-card text-foreground hover:bg-muted'
                             }`}
                     >
                         Full Page
@@ -178,7 +181,7 @@ export default function Notebook() {
                     value={fullText}
                     onChange={(e) => handleFullTextChange(e.target.value)}
                     rows={24}
-                    className="w-full border border-border bg-card text-foreground rounded-lg p-4 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-royal-blue"
+                    className="w-full bg-card text-foreground rounded-lg p-4 text-sm font-mono focus:outline-none"
                     placeholder="Start typing your full-page notes here..."
                 />
             )}
