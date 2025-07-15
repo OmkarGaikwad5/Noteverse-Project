@@ -31,18 +31,61 @@ interface TextBoxData {
     isEditing?: boolean;
 }
 
-export default function CanvasBoard() {
+function safeParseArray<T>(data: unknown, defaultValue: T): T {
+  return Array.isArray(data) ? (data as T) : defaultValue;
+}
+
+export default function CanvasBoard({ noteId }: { noteId: string }) {
+    const storageKey = `canvasNotes-${noteId}`;
     const [scale, setScale] = useState(1);
     const [stagePos, setStagePos] = useState({ x: 0, y: 0 });
-    const [lines, setLines] = useState<LineData[][]>([[]]);
-    const [textBoxes, setTextBoxes] = useState<TextBoxData[][]>([[]]);
+    const [lines, setLines] = useState<LineData[][]>(() => {
+        if (typeof window === 'undefined') return [[]];
+        const saved = localStorage.getItem(storageKey);
+        if (saved) {
+            try {
+                const parsed = JSON.parse(saved);
+                return safeParseArray(parsed.lines, [[]]);
+            } catch (e) {
+                console.error('❌ Failed to parse lines from storage', e);
+            }
+        }
+        return [[]]; // default 1 empty page
+    });
+
+    const [textBoxes, setTextBoxes] = useState<TextBoxData[][]>(() => {
+        if (typeof window === 'undefined') return [[]];
+        const saved = localStorage.getItem(storageKey);
+        if (saved) {
+            try {
+                const parsed = JSON.parse(saved);
+                return safeParseArray(parsed.textBoxes, [[]]);
+            } catch (e) {
+                console.error('❌ Failed to parse textBoxes from storage', e);
+            }
+        }
+        return [[]];
+    });
     const [mode, setMode] = useState<'pen' | 'text' | 'eraser' | 'shape'>('pen');
     const [pageIndex, setPageIndex] = useState(0);
     const isDrawing = useRef(false);
     const [penSize, setPenSize] = useState(4);
     const undoStack = useRef<{ lines: LineData[][]; textBoxes: TextBoxData[][]; shapes: ShapeData[][] }[]>([]);
     const redoStack = useRef<{ lines: LineData[][]; textBoxes: TextBoxData[][]; shapes: ShapeData[][] }[]>([]);
-    const [shapes, setShapes] = useState<ShapeData[][]>([[]]);
+
+    const [shapes, setShapes] = useState<ShapeData[][]>(() => {
+        if (typeof window === 'undefined') return [[]];
+        const saved = localStorage.getItem(storageKey);
+        if (saved) {
+            try {
+                const parsed = JSON.parse(saved);
+                return safeParseArray(parsed.shapes, [[]]);
+            } catch (e) {
+                console.error('❌ Failed to parse shapes from storage', e);
+            }
+        }
+        return [[]];
+    });
     const [selectedShape, setSelectedShape] = useState<ShapeType>('rectangle'); // dropdown option
     const shapeStart = useRef<{ x: number; y: number } | null>(null);
     const stageRef = useRef<Konva.Stage | null>(null);
@@ -58,19 +101,6 @@ export default function CanvasBoard() {
 
     const currentLines = lines[pageIndex] || [];
     const currentTextBoxes = textBoxes[pageIndex] || [];
-
-    useEffect(() => {
-        const saved = localStorage.getItem('canvasNotes');
-        if (saved) {
-            try {
-                const parsed = JSON.parse(saved);
-                setLines(parsed.lines || [[]]);
-                setTextBoxes(parsed.textBoxes || [[]]);
-            } catch (e) {
-                console.error("Failed to parse saved data", e);
-            }
-        }
-    }, []);
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -90,10 +120,10 @@ export default function CanvasBoard() {
 
     useEffect(() => {
         localStorage.setItem(
-            'canvasNotes',
-            JSON.stringify({ lines, textBoxes })
+            `canvasNotes-${noteId}`,
+            JSON.stringify({ lines, textBoxes, shapes }) // ✅ Save shapes
         );
-    }, [lines, textBoxes]);
+    }, [lines, textBoxes, shapes, noteId]);
 
     useEffect(() => {
         switch (mode) {
@@ -232,7 +262,7 @@ export default function CanvasBoard() {
             setSelectedShapeId(null);
         }
         const stage = e.target.getStage();
-        if(!stage) return;
+        if (!stage) return;
         const pointer = stage.getPointerPosition();
         if (!pointer) return;
         const pos = {
