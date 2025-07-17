@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "NoteVerse",
-  description: "Creaft notes!",
+  description: "Organize, create, and manage your notes effortlessly with NoteVerse — your intelligent note-taking companion.",
 };
 
 export default function RootLayout({

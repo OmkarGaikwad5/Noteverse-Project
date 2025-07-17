@@ -119,6 +119,10 @@ export default function CanvasBoard({ noteId }: { noteId: string }) {
     }, [selectedShapeId, shapes, pageIndex]);
 
     useEffect(() => {
+        document.title = "Note - Canvas"
+    }, []);
+
+    useEffect(() => {
         localStorage.setItem(
             `canvasNotes-${noteId}`,
             JSON.stringify({ lines, textBoxes, shapes }) // ✅ Save shapes
