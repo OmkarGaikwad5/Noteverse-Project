@@ -55,6 +55,16 @@
   .dark .hover\:bg-coral:hover { background-color: #FF4500; }
 }
 
+@keyframes wiggle {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-10deg); }
+  50% { transform: rotate(10deg); }
+  75% { transform: rotate(-5deg); }
+}
+
+.animate-wiggle {
+  animation: wiggle 0.6s ease-in-out;
+}
 
 @theme inline {
   --color-background: var(--background);

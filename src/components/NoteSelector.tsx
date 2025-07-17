@@ -3,7 +3,8 @@ import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import NoteOptions from "./NoteOptions";
 import ModalWrapper from "./custom/ModalWrapper";
-
+import { FiEdit2, FiTrash2 } from "react-icons/fi"; // Feather Icons
+import BinButton from "./custom/BinButton";
 
 type NoteType = "canvas" | "notebook";
 
@@ -15,6 +16,7 @@ interface Note {
 }
 
 const LOCAL_STORAGE_KEY = "noteverse-notes";
+const BIN_STORAGE_KEY = "noteverse-bin";
 
 const NoteSelector: React.FC = () => {
     const [notes, setNotes] = useState<Note[]>([]);
@@ -22,6 +24,7 @@ const NoteSelector: React.FC = () => {
     const navigate = useRouter();
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editedTitle, setEditedTitle] = useState("");
+    const [isDeleting, setIsDeleting] = useState<boolean>(false);
 
     const handleTitleEdit = (id: string, newTitle: string) => {
         const updatedNotes = notes.map((n) =>
@@ -32,6 +35,25 @@ const NoteSelector: React.FC = () => {
         setEditingId(null);
     };
 
+    const handleDelete = (id: string) => {
+        const noteToDelete = notes.find((n) => n.id === id);
+        if (!noteToDelete) return;
+        setIsDeleting(true);
+        const updatedNotes = notes.filter((n) => n.id !== id);
+        setNotes(updatedNotes);
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updatedNotes));
+
+        const existingBin = JSON.parse(localStorage.getItem(BIN_STORAGE_KEY) || "[]");
+        const updatedBin = [noteToDelete, ...existingBin];
+        localStorage.setItem(BIN_STORAGE_KEY, JSON.stringify(updatedBin));
+        setTimeout(() => {
+            setIsDeleting(false);
+        }, 100)
+    };
+
+    useEffect(() => {
+        document.title = "Notes - NoteVerse";
+    }, []);
     // 🔁 Load notes from localStorage on component mount
     useEffect(() => {
         const savedNotes = localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -51,13 +73,14 @@ const NoteSelector: React.FC = () => {
         setNotes(updatedNotes);
         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updatedNotes));
         setShowNewModal(false);
-        navigate.push(`/note/${newNote.id}?mode=${type}`);
+        // navigate.push(`/note/${newNote.id}?mode=${type}`);
     };
 
     return (
         <div className="p-8">
             <div className="flex items-center justify-between mb-6">
                 <h1 className="text-2xl font-bold">Your Notebooks ({notes.length})</h1>
+                <BinButton animate={isDeleting}/>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -105,15 +128,26 @@ const NoteSelector: React.FC = () => {
                                         {note.title}
                                     </h2>
                                     <button
-                                        className="text-sm text-royal-blue hover:underline opacity-0 group-hover:opacity-100"
+                                        className="text-sm text-royal-blue flex flex-col items-center justify-center cursor-pointer hover:underline opacity-0 group-hover:opacity-100"
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             setEditingId(note.id);
                                             setEditedTitle(note.title);
                                         }}
                                     >
+                                         <FiEdit2 size={16} />
                                         Edit
                                     </button>
+                                        <button
+                                            className="text-sm text-red-500 flex flex-col items-center justify-center cursor-pointer hover:underline opacity-0 group-hover:opacity-100"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleDelete(note.id);
+                                            }}
+                                        >
+                                            <FiTrash2 size={16}/>
+                                            Delete
+                                        </button>
                                 </div>
                             )}
                             <p className="text-sm text-gray-500 capitalize">{note.type}</p>

@@ -77,6 +77,10 @@ export default function Notebook({ noteId }: { noteId: string }) {
         if (pageIndex < pages.length - 1) setPageIndex(pageIndex + 1);
     };
 
+    useEffect(() => {
+        document.title = "Note - Notebook"
+    }, []);
+
     return (
         <div className="p-6 max-w-4xl mx-auto text-foreground">
             {/* Header and Mode Switch */}
