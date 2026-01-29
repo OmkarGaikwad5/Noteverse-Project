@@ -54,10 +54,10 @@ function NotebookViewerContent({ notebookId, userId }: NotebookViewerProps) {
     };
 
     return (
-        <div className="h-screen w-screen flex flex-col bg-gray-50/50 relative overflow-hidden">
+        <div className="h-screen w-screen flex flex-col bg-background relative overflow-hidden">
             {/* Top Bar - Glassmorphism */}
-            <div className="h-14 absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-6 bg-white/80 backdrop-blur-xl border-b border-white/20 shadow-sm">
-                <div className="font-semibold text-gray-800 flex items-center gap-2">
+            <div className="h-14 absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-6 bg-surface/80 backdrop-blur-xl border-b border-border/20 shadow-sm">
+                <div className="font-semibold text-ink-primary flex items-center gap-2">
                     <span className="text-lg tracking-tight">Notebook</span>
                     {isSyncing && (
                         <span className="flex items-center gap-1 text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full border border-green-100">
@@ -67,35 +67,35 @@ function NotebookViewerContent({ notebookId, userId }: NotebookViewerProps) {
                     )}
                 </div>
                 <div className="flex items-center gap-3">
-                    <div className="flex items-center bg-gray-100/50 p-1 rounded-lg border border-gray-200/50">
+                    <div className="flex items-center bg-background p-1 rounded-lg border border-border">
                         <Button
                             disabled={pageIndex === 0}
                             onClick={() => setPageIndex(p => p - 1)}
                             variant="ghost" size="icon"
-                            className="h-7 w-7 rounded-md hover:bg-white hover:shadow-sm"
+                            className="h-7 w-7 rounded-md hover:bg-surface hover:shadow-sm"
                         >
-                            <FaChevronLeft className="w-3 h-3 text-gray-600" />
+                            <FaChevronLeft className="w-3 h-3 text-ink-secondary" />
                         </Button>
-                        <span className="text-sm font-medium text-gray-600 px-3 select-none">Page {pageIndex + 1}</span>
+                        <span className="text-sm font-medium text-ink-primary px-3 select-none">Page {pageIndex + 1}</span>
                         <Button
                             onClick={() => setPageIndex(p => p + 1)}
                             variant="ghost" size="icon"
-                            className="h-7 w-7 rounded-md hover:bg-white hover:shadow-sm"
+                            className="h-7 w-7 rounded-md hover:bg-surface hover:shadow-sm"
                         >
-                            <FaChevronRight className="w-3 h-3 text-gray-600" />
+                            <FaChevronRight className="w-3 h-3 text-ink-secondary" />
                         </Button>
                     </div>
-                    <div className="h-4 w-[1px] bg-gray-300 mx-1"></div>
-                    <Button onClick={handleAddPage} size="sm" className="bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg transition-all active:scale-95 gap-2">
+                    <div className="h-4 w-[1px] bg-border mx-1"></div>
+                    <Button onClick={handleAddPage} size="sm" className="bg-primary hover:bg-primary-hover text-white shadow-md hover:shadow-lg transition-all active:scale-95 gap-2">
                         <FaPlus className="w-3 h-3" /> Add Page
                     </Button>
                 </div>
             </div>
 
             {/* Canvas Area */}
-            <div className="flex-1 relative flex justify-center pt-15 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:20px_20px] opacity-100">
+            <div className="flex-1 relative flex justify-center pt-15 bg-[radial-gradient(var(--border)_1px,transparent_1px)] [background-size:20px_20px] opacity-100">
                 {/* The "Paper" Container */}
-                <div className="bg-white shadow-md rounded-sm duration-300" style={{ flex: '0 0 auto', width: 'auto', height: 'auto' }}>
+                <div className="bg-surface shadow-md rounded-sm duration-300" style={{ flex: '0 0 auto', width: 'auto', height: 'auto' }}>
                     {!loading ? (
                         <CanvasPage
                             key={`${notebookId}-${pageIndex}`}
@@ -104,8 +104,8 @@ function NotebookViewerContent({ notebookId, userId }: NotebookViewerProps) {
                             onSave={handleSave}
                         />
                     ) : (
-                        <div className="flex items-center justify-center h-full w-[800px] bg-white rounded-sm shadow-sm animate-pulse">
-                            <div className="text-gray-400 font-medium">Loading Page...</div>
+                        <div className="flex items-center justify-center h-full w-[800px] bg-surface rounded-sm shadow-sm animate-pulse">
+                            <div className="text-ink-muted font-medium">Loading Page...</div>
                         </div>
                     )}
                 </div>

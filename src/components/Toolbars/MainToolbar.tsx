@@ -32,14 +32,14 @@ export default function MainToolbar({
     // Helper for button classes to keep JSX clean
     const getButtonClass = (isActive: boolean) =>
         `transition-all duration-200 hover:scale-105 active:scale-95 ${isActive
-            ? 'bg-blue-600 text-white shadow-md hover:bg-blue-700'
-            : 'hover:bg-gray-100 text-gray-900'
+            ? 'bg-primary text-white shadow-md hover:bg-primary-hover'
+            : 'hover:bg-background text-ink-primary'
         }`;
 
     return (
         <div className="absolute top-6 left-6 z-10 flex flex-col gap-4">
             {/* Main Tools Container - Glassm effect */}
-            <div className="flex gap-2 bg-white/80 backdrop-blur-xl shadow-2xl border border-white/40 p-2 rounded-2xl items-center ring-1 ring-black/5">
+            <div className="flex gap-2 bg-surface/80 backdrop-blur-xl shadow-2xl border border-border/40 p-2 rounded-2xl items-center ring-1 ring-black/5">
 
                 {/* Pen Tool with Settings */}
                 <Popover>
@@ -54,11 +54,11 @@ export default function MainToolbar({
                             <FaPen className="w-4 h-4" />
                         </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-56 p-4 bg-white/90 backdrop-blur-xl border-white/20 shadow-xl rounded-xl" align="start" sideOffset={10}>
+                    <PopoverContent className="w-56 p-4 bg-surface/90 backdrop-blur-xl border-border/20 shadow-xl rounded-xl" align="start" sideOffset={10}>
                         <div className="space-y-4">
-                            <h4 className="font-semibold text-sm text-gray-700">Pen Settings</h4>
+                            <h4 className="font-semibold text-sm text-ink-primary">Pen Settings</h4>
                             <div className="space-y-2">
-                                <div className="flex justify-between text-xs text-muted-foreground">
+                                <div className="flex justify-between text-xs text-ink-secondary">
                                     <span>Thickness</span>
                                     <span>{penSize}px</span>
                                 </div>
@@ -66,14 +66,14 @@ export default function MainToolbar({
                                     type="range" min="1" max="20"
                                     value={penSize}
                                     onChange={(e) => setPenSize(parseInt(e.target.value))}
-                                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                                    className="w-full h-2 bg-background rounded-lg appearance-none cursor-pointer accent-primary"
                                 />
                             </div>
                             <div className="flex gap-2 justify-between pt-1">
                                 {['#000000', '#EF4444', '#3B82F6', '#10B981', '#F59E0B', '#8B5CF6'].map(c => (
                                     <button
                                         key={c}
-                                        className={`w-6 h-6 rounded-full transition-transform hover:scale-110 ${penColor === c ? 'ring-2 ring-offset-2 ring-blue-500 scale-110' : 'border border-gray-200'}`}
+                                        className={`w-6 h-6 rounded-full transition-transform hover:scale-110 ${penColor === c ? 'ring-2 ring-offset-2 ring-primary scale-110' : 'border border-border'}`}
                                         style={{ backgroundColor: c }}
                                         onClick={() => setPenColor(c)}
                                     />
@@ -96,7 +96,7 @@ export default function MainToolbar({
                             <FaEraser className="w-4 h-4" />
                         </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-44 p-2 bg-white/90 backdrop-blur-xl border-white/20 shadow-xl rounded-xl" sideOffset={10}>
+                    <PopoverContent className="w-44 p-2 bg-surface/90 backdrop-blur-xl border-border/20 shadow-xl rounded-xl" sideOffset={10}>
                         <div className="flex flex-col gap-1">
                             {[
                                 { id: 'standard', label: 'Standard Eraser' },
@@ -106,7 +106,7 @@ export default function MainToolbar({
                                 <Button
                                     key={item.id}
                                     variant="ghost"
-                                    className={`justify-start h-9 text-sm font-medium transition-colors ${eraserMode === item.id ? 'bg-blue-50 text-blue-700' : 'hover:bg-gray-100'}`}
+                                    className={`justify-start h-9 text-sm font-medium transition-colors ${eraserMode === item.id ? 'bg-primary-soft text-primary' : 'hover:bg-background text-ink-primary'}`}
                                     onClick={() => { setEraserMode(item.id as any); setMode('eraser'); }}
                                 >
                                     {item.label}
@@ -139,7 +139,7 @@ export default function MainToolbar({
                             <FaShapes className="w-4 h-4" />
                         </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-72 p-3 bg-white/90 backdrop-blur-xl border-white/20 shadow-xl rounded-xl" align="start" sideOffset={10}>
+                    <PopoverContent className="w-72 p-3 bg-surface/90 backdrop-blur-xl border-border/20 shadow-xl rounded-xl" align="start" sideOffset={10}>
                         <div className="grid grid-cols-5 gap-2">
                             {[
                                 { id: 'rectangle', icon: <FaSquare /> },
@@ -158,7 +158,7 @@ export default function MainToolbar({
                                     key={shape.id}
                                     variant="ghost"
                                     size="icon"
-                                    className={`aspect-square hover:bg-blue-500 hover:text-white transition-colors ${selectedShape === shape.id ? 'bg-blue-500 text-white' : 'text-gray-600'}`}
+                                    className={`aspect-square hover:bg-primary hover:text-white transition-colors ${selectedShape === shape.id ? 'bg-primary text-white' : 'text-ink-secondary'}`}
                                     onClick={() => { setSelectedShape(shape.id as any); setMode('shape'); }}
                                     title={shape.id}
                                 >
@@ -169,11 +169,11 @@ export default function MainToolbar({
                     </PopoverContent>
                 </Popover>
 
-                <div className="w-[1px] h-6 bg-gray-200 mx-1"></div>
+                <div className="w-[1px] h-6 bg-border mx-1"></div>
 
                 <div className="flex gap-1">
-                    <Button onClick={undo} variant="ghost" size="icon" className="hover:bg-gray-100 text-gray-700 transition-transform active:scale-90" title="Undo"><FaUndo className="w-4 h-4" /></Button>
-                    <Button onClick={redo} variant="ghost" size="icon" className="hover:bg-gray-100 text-gray-700 transition-transform active:scale-90" title="Redo"><FaRedo className="w-4 h-4" /></Button>
+                    <Button onClick={undo} variant="ghost" size="icon" className="hover:bg-background text-ink-primary transition-transform active:scale-90" title="Undo"><FaUndo className="w-4 h-4" /></Button>
+                    <Button onClick={redo} variant="ghost" size="icon" className="hover:bg-background text-ink-primary transition-transform active:scale-90" title="Redo"><FaRedo className="w-4 h-4" /></Button>
                 </div>
             </div>
         </div>

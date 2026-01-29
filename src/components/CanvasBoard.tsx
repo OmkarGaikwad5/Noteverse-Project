@@ -435,18 +435,18 @@ export default function CanvasBoard({ noteId }: { noteId: string }) {
         <div
             className="p-4">
             <div className="fixed top-4 left-4 z-50">
-                <div className="bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden">
+                <div className="bg-surface rounded-lg shadow-xl border border-border overflow-hidden">
                     {/* Main toolbar */}
                     <div className="p-2 flex flex-wrap gap-1 max-w-xs">
                         {/* Tools section */}
-                        <div className="flex gap-1 p-1 border-b border-gray-100">
+                        <div className="flex gap-1 p-1 border-b border-border/50">
                             <Button
                                 onClick={() => setMode('pen')}
                                 variant={mode === 'pen' ? 'secondary' : 'ghost'}
                                 className="h-8 w-8 p-0"
                                 title="Pen"
                             >
-                                <FaPen className="text-sm" />
+                                <FaPen className="text-sm text-ink-primary" />
                             </Button>
                             <Button
                                 onClick={() => setMode('eraser')}
@@ -455,7 +455,7 @@ export default function CanvasBoard({ noteId }: { noteId: string }) {
                                 className="h-8 w-8 p-0"
                                 title="Eraser"
                             >
-                                <FaEraser className="text-sm" />
+                                <FaEraser className="text-sm text-ink-primary" />
                             </Button>
                             <Button
                                 onClick={() => setMode('text')}
@@ -464,26 +464,26 @@ export default function CanvasBoard({ noteId }: { noteId: string }) {
                                 className="h-8 w-8 p-0"
                                 title="Text"
                             >
-                                <FaFont className="text-sm" />
+                                <FaFont className="text-sm text-ink-primary" />
                             </Button>
                         </div>
 
                         {/* Pen size controls */}
-                        <div className="flex items-center gap-2 p-2 border-b border-gray-100">
-                            <div className="flex-shrink-0 text-xs text-gray-500">Size</div>
+                        <div className="flex items-center gap-2 p-2 border-b border-border/50">
+                            <div className="flex-shrink-0 text-xs text-ink-secondary">Size</div>
                             <input
                                 type="range"
                                 min={1}
                                 max={15}
                                 value={penSize}
                                 onChange={(e) => setPenSize(Number(e.target.value))}
-                                className="w-20 h-1 rounded-full appearance-none bg-gray-200 accent-blue-500"
+                                className="w-20 h-1 rounded-full appearance-none bg-background accent-primary"
                             />
-                            <div className="text-xs w-4 text-center">{penSize}</div>
+                            <div className="text-xs w-4 text-center text-ink-primary">{penSize}</div>
                         </div>
 
                         {/* Page navigation */}
-                        <div className="flex gap-1 p-1 border-b border-gray-100">
+                        <div className="flex gap-1 p-1 border-b border-border/50">
                             <Button
                                 onClick={prevPage}
                                 disabled={pageIndex === 0}
@@ -492,9 +492,9 @@ export default function CanvasBoard({ noteId }: { noteId: string }) {
                                 className="h-8 w-8 p-0"
                                 title="Previous page"
                             >
-                                <FaArrowLeft className="text-sm" />
+                                <FaArrowLeft className="text-sm text-ink-primary" />
                             </Button>
-                            <div className="flex items-center px-2 text-sm">
+                            <div className="flex items-center px-2 text-sm text-ink-primary">
                                 {pageIndex + 1}/{lines.length}
                             </div>
                             <Button
@@ -505,7 +505,7 @@ export default function CanvasBoard({ noteId }: { noteId: string }) {
                                 className="h-8 w-8 p-0"
                                 title="Next page"
                             >
-                                <FaArrowRight className="text-sm" />
+                                <FaArrowRight className="text-sm text-ink-primary" />
                             </Button>
                             <Button
                                 onClick={addPage}
@@ -513,7 +513,7 @@ export default function CanvasBoard({ noteId }: { noteId: string }) {
                                 className="h-8 w-8 p-0"
                                 title="Add page"
                             >
-                                <FaPlus color='black' className="text-sm" />
+                                <FaPlus className="text-sm text-ink-primary" />
                             </Button>
                         </div>
                         <div className='flex gap-1 p-1'>
@@ -523,12 +523,12 @@ export default function CanvasBoard({ noteId }: { noteId: string }) {
                                 // className="flex items-center gap-2"
                                 className="h-8 w-8 p-0"
                             >
-                                <FaShapes className="text-sm" />
+                                <FaShapes className="text-sm text-ink-primary" />
                             </Button>
                             <select
                                 value={selectedShape}
                                 onChange={(e) => setSelectedShape(e.target.value as ShapeType)}
-                                className="ml-2 border rounded p-1"
+                                className="ml-2 border border-border rounded p-1 bg-surface text-ink-primary text-xs"
                             >
                                 <option value="rectangle">Rectangle</option>
                                 <option value="circle">Circle</option>
@@ -551,7 +551,7 @@ export default function CanvasBoard({ noteId }: { noteId: string }) {
                                 className="h-8 w-8 p-0"
                                 title="Delete selected shape"
                             >
-                                <FaTrash className="text-sm" />
+                                <FaTrash className="text-sm text-coral" />
                             </Button>
                         </div>
 
@@ -564,7 +564,7 @@ export default function CanvasBoard({ noteId }: { noteId: string }) {
                                 className="h-8 w-8 p-0"
                                 title="Undo"
                             >
-                                <FaUndo className="text-sm" />
+                                <FaUndo className="text-sm text-ink-primary" />
                             </Button>
                             <Button
                                 onClick={redo}
@@ -573,7 +573,7 @@ export default function CanvasBoard({ noteId }: { noteId: string }) {
                                 className="h-8 w-8 p-0"
                                 title="Redo"
                             >
-                                <FaRedo className="text-sm" />
+                                <FaRedo className="text-sm text-ink-primary" />
                             </Button>
                             <Button
                                 onClick={handleClear}
@@ -582,7 +582,7 @@ export default function CanvasBoard({ noteId }: { noteId: string }) {
                                 className="h-8 w-8 p-0"
                                 title="Clear page"
                             >
-                                <FaTrash className="text-sm" />
+                                <FaTrash className="text-sm text-coral" />
                             </Button>
                             <Button
                                 onClick={exportImage}
@@ -591,12 +591,12 @@ export default function CanvasBoard({ noteId }: { noteId: string }) {
                                 className="h-8 w-8 p-0"
                                 title="Export"
                             >
-                                <FaImage className="text-sm" />
+                                <FaImage className="text-sm text-ink-primary" />
                             </Button>
                         </div>
 
                         {/* Zoom controls */}
-                        <div className="flex gap-1 p-1 border-t border-gray-100">
+                        <div className="flex gap-1 p-1 border-t border-border/50">
                             <Button
                                 onClick={() => setScale(prev => Math.max(prev / 1.1, 0.3))}
 
@@ -604,9 +604,9 @@ export default function CanvasBoard({ noteId }: { noteId: string }) {
                                 className="h-8 w-8 p-0"
                                 title="Zoom Out"
                             >
-                                <FaMinus className="text-sm" />
+                                <FaMinus className="text-sm text-ink-primary" />
                             </Button>
-                            <div className="flex items-center px-2 text-xs">
+                            <div className="flex items-center px-2 text-xs text-ink-primary">
                                 {Math.round(scale * 100)}%
                             </div>
                             <Button
@@ -615,7 +615,7 @@ export default function CanvasBoard({ noteId }: { noteId: string }) {
                                 className="h-8 w-8 p-0"
                                 title="Zoom In"
                             >
-                                <FaPlus className="text-sm" />
+                                <FaPlus className="text-sm text-ink-primary" />
                             </Button>
                             <Button
                                 onClick={() => {
@@ -627,7 +627,7 @@ export default function CanvasBoard({ noteId }: { noteId: string }) {
                                 className="h-8 w-8 p-0"
                                 title="Reset Zoom"
                             >
-                                <span className="text-xs">1:1</span>
+                                <span className="text-xs text-ink-secondary">1:1</span>
                             </Button>
                         </div>
                     </div>
