@@ -1,30 +1,18 @@
 'use client';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { usePersistentState } from '@/hooks/usePersistentState';
 
 export default function Notebook({ noteId }: { noteId: string }) {
     const storageKey = `notebookLines-${noteId}`;
     const [pageIndex, setPageIndex] = useState(0);
-    const [pages, setPages] = useState<string[][]>(() => {
-        // ✅ Load once from localStorage on initial render
-        if (typeof window !== 'undefined') {
-            const saved = localStorage.getItem(storageKey);
-            if (saved) {
-                try {
-                    const parsed = JSON.parse(saved);
-                    if (Array.isArray(parsed)) return parsed;
-                } catch (e) {
-                    console.error('❌ Failed to parse saved notebook:', e);
-                }
-            }
-        }
-        return [['']]; // default: 1 page with 1 empty line
-    });
+
+    // Using usePersistentState for auto-sync and persistence
+    const [pages, setPages] = usePersistentState<string[][]>(storageKey, [['']], noteId);
+
     const [mode, setMode] = useState<'line' | 'full'>('line');
     const lineInputRefs = useRef<(HTMLTextAreaElement | null)[]>([]);
 
-    useEffect(() => {
-        localStorage.setItem(storageKey, JSON.stringify(pages));
-    }, [pages, storageKey]);
+    // Removed manual useEffect for localStorage
 
     const handleLineChange = (lineIndex: number, text: string) => {
         const updated = [...pages];
@@ -56,7 +44,7 @@ export default function Notebook({ noteId }: { noteId: string }) {
             updated[pageIndex] = [];
             setPages(updated);
         }
-    }, [pages, pageIndex]);
+    }, [pages, pageIndex, setPages]);
 
     useEffect(() => {
         ensurePage();

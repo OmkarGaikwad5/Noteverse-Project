@@ -1,9 +1,11 @@
+
 'use client'
 import { Stage, Layer, Line, Text, Circle, Rect } from 'react-konva';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from '@/components/custom/button';
 import { FaPen, FaEraser, FaFont, FaTrash, FaPlus, FaArrowLeft, FaArrowRight, FaUndo, FaRedo, FaImage, FaMinus, FaShapes } from 'react-icons/fa';
 import Konva from 'konva';
+import { usePersistentState } from '@/hooks/usePersistentState';
 
 interface LineData {
     points: number[];
@@ -31,41 +33,45 @@ interface TextBoxData {
     isEditing?: boolean;
 }
 
-function safeParseArray<T>(data: unknown, defaultValue: T): T {
-  return Array.isArray(data) ? (data as T) : defaultValue;
-}
-
 export default function CanvasBoard({ noteId }: { noteId: string }) {
     const storageKey = `canvasNotes-${noteId}`;
     const [scale, setScale] = useState(1);
     const [stagePos, setStagePos] = useState({ x: 0, y: 0 });
-    const [lines, setLines] = useState<LineData[][]>(() => {
-        if (typeof window === 'undefined') return [[]];
-        const saved = localStorage.getItem(storageKey);
-        if (saved) {
-            try {
-                const parsed = JSON.parse(saved);
-                return safeParseArray(parsed.lines, [[]]);
-            } catch (e) {
-                console.error('❌ Failed to parse lines from storage', e);
-            }
-        }
-        return [[]]; // default 1 empty page
-    });
 
-    const [textBoxes, setTextBoxes] = useState<TextBoxData[][]>(() => {
-        if (typeof window === 'undefined') return [[]];
-        const saved = localStorage.getItem(storageKey);
-        if (saved) {
-            try {
-                const parsed = JSON.parse(saved);
-                return safeParseArray(parsed.textBoxes, [[]]);
-            } catch (e) {
-                console.error('❌ Failed to parse textBoxes from storage', e);
-            }
-        }
-        return [[]];
-    });
+    // Combined Persistent State
+    const [canvasData, setCanvasData] = usePersistentState(storageKey, {
+        lines: [[]] as LineData[][],
+        textBoxes: [[]] as TextBoxData[][],
+        shapes: [[]] as ShapeData[][]
+    }, noteId);
+
+    // Destructure for ease of use
+    const lines = canvasData.lines || [[]];
+    const textBoxes = canvasData.textBoxes || [[]];
+    const shapes = canvasData.shapes || [[]];
+
+    // Backward-compatible setters
+    const setLines = useCallback((updater: LineData[][] | ((prev: LineData[][]) => LineData[][])) => {
+        setCanvasData(prev => ({
+            ...prev,
+            lines: typeof updater === 'function' ? updater(prev.lines || [[]]) : updater
+        }));
+    }, [setCanvasData]);
+
+    const setTextBoxes = useCallback((updater: TextBoxData[][] | ((prev: TextBoxData[][]) => TextBoxData[][])) => {
+        setCanvasData(prev => ({
+            ...prev,
+            textBoxes: typeof updater === 'function' ? updater(prev.textBoxes || [[]]) : updater
+        }));
+    }, [setCanvasData]);
+
+    const setShapes = useCallback((updater: ShapeData[][] | ((prev: ShapeData[][]) => ShapeData[][])) => {
+        setCanvasData(prev => ({
+            ...prev,
+            shapes: typeof updater === 'function' ? updater(prev.shapes || [[]]) : updater
+        }));
+    }, [setCanvasData]);
+
     const [mode, setMode] = useState<'pen' | 'text' | 'eraser' | 'shape'>('pen');
     const [pageIndex, setPageIndex] = useState(0);
     const isDrawing = useRef(false);
@@ -73,19 +79,6 @@ export default function CanvasBoard({ noteId }: { noteId: string }) {
     const undoStack = useRef<{ lines: LineData[][]; textBoxes: TextBoxData[][]; shapes: ShapeData[][] }[]>([]);
     const redoStack = useRef<{ lines: LineData[][]; textBoxes: TextBoxData[][]; shapes: ShapeData[][] }[]>([]);
 
-    const [shapes, setShapes] = useState<ShapeData[][]>(() => {
-        if (typeof window === 'undefined') return [[]];
-        const saved = localStorage.getItem(storageKey);
-        if (saved) {
-            try {
-                const parsed = JSON.parse(saved);
-                return safeParseArray(parsed.shapes, [[]]);
-            } catch (e) {
-                console.error('❌ Failed to parse shapes from storage', e);
-            }
-        }
-        return [[]];
-    });
     const [selectedShape, setSelectedShape] = useState<ShapeType>('rectangle'); // dropdown option
     const shapeStart = useRef<{ x: number; y: number } | null>(null);
     const stageRef = useRef<Konva.Stage | null>(null);
@@ -116,18 +109,13 @@ export default function CanvasBoard({ noteId }: { noteId: string }) {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [selectedShapeId, shapes, pageIndex]);
+    }, [selectedShapeId, shapes, pageIndex, setShapes]); // setShapes is stable but included for completeness
 
     useEffect(() => {
         document.title = "Note - Canvas"
     }, []);
 
-    useEffect(() => {
-        localStorage.setItem(
-            `canvasNotes-${noteId}`,
-            JSON.stringify({ lines, textBoxes, shapes }) // ✅ Save shapes
-        );
-    }, [lines, textBoxes, shapes, noteId]);
+    // Removed manual localStorage effect
 
     useEffect(() => {
         switch (mode) {
@@ -802,37 +790,26 @@ export default function CanvasBoard({ noteId }: { noteId: string }) {
                     )}
                 </Layer>
             </Stage>
-
-            {/* Floating text input for editing */}
-            {currentTextBoxes.map((box) => (
-                box.isEditing && (
-                    <textarea
-                        key={box.id}
-                        ref={textInputRef}
-                        value={box.text}
-                        onChange={(e) => handleTextChange(box.id, e.target.value)}
-                        onBlur={() => handleTextBlur()}
-                        style={{
-                            position: 'absolute',
-                            top: box.y + 5,
-                            left: box.x + 5,
-                            fontSize: '20px',
-                            border: '1px solid #ccc',
-                            padding: '4px',
-                            zIndex: 100,
-                            width: '200px',
-                            minHeight: '30px',
-                            backgroundColor: 'white'
-                        }}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter' && !e.shiftKey) {
-                                e.preventDefault();
-                                handleTextBlur();
-                            }
-                        }}
-                    />
-                )
-            ))}
+            {/* Hidden Text Area for Input */}
+            {currentTextBoxes.some(b => b.isEditing) && (
+                <textarea
+                    ref={textInputRef}
+                    style={{
+                        position: 'absolute',
+                        top: -1000,
+                        left: -1000,
+                        opacity: 0,
+                    }}
+                    value={
+                        currentTextBoxes.find(b => b.isEditing)?.text || ''
+                    }
+                    onChange={(e) => {
+                        const box = currentTextBoxes.find(b => b.isEditing);
+                        if (box) handleTextChange(box.id, e.target.value);
+                    }}
+                    onBlur={handleTextBlur}
+                />
+            )}
         </div>
     );
 }
