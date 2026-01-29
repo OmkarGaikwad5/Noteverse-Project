@@ -509,12 +509,11 @@ export default function CanvasBoard({ noteId }: { noteId: string }) {
                             </Button>
                             <Button
                                 onClick={addPage}
-
                                 variant="ghost"
                                 className="h-8 w-8 p-0"
                                 title="Add page"
                             >
-                                <FaPlus className="text-sm" />
+                                <FaPlus color='black' className="text-sm" />
                             </Button>
                         </div>
                         <div className='flex gap-1 p-1'>

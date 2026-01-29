@@ -2,7 +2,8 @@ import React from 'react';
 import clsx from 'clsx';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'ghost';
+  variant?: 'primary' | 'secondary' | 'ghost' | 'outline';
+  size?: 'default' | 'sm' | 'lg' | 'icon';
   children: React.ReactNode;
   className?: string;
   active?: boolean;
@@ -10,6 +11,7 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 
 function Button({
   variant = 'primary',
+  size = 'default',
   children,
   className,
   disabled,
@@ -18,6 +20,13 @@ function Button({
 }: ButtonProps) {
   const baseClasses =
     'inline-flex items-center justify-center rounded-md font-medium transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring';
+
+  const sizeClasses = {
+    default: 'h-10 px-4 py-2',
+    sm: 'h-9 rounded-md px-3',
+    lg: 'h-11 rounded-md px-8',
+    icon: 'h-9 w-9',
+  };
 
   const variantClasses = {
     primary: {
@@ -32,8 +41,14 @@ function Button({
       active: 'bg-transparent text-foreground hover:bg-muted focus-visible:ring-ring active:bg-muted-foreground/10',
       inactive: 'bg-transparent text-muted-foreground hover:bg-muted focus-visible:ring-ring active:bg-muted-foreground/10',
     },
+    outline: { // Added outline variant as it was used in viewer
+      active: 'border border-input bg-background hover:bg-accent hover:text-accent-foreground',
+      inactive: 'border border-input bg-background hover:bg-accent hover:text-accent-foreground',
+    },
     disabled: 'bg-muted text-muted-foreground opacity-50 cursor-not-allowed',
   };
+
+  const currentVariant = variantClasses[variant] || variantClasses.primary;
 
   return (
     <button
@@ -41,11 +56,12 @@ function Button({
       disabled={disabled}
       className={clsx(
         baseClasses,
+        sizeClasses[size],
         disabled
           ? variantClasses.disabled
           : active
-            ? variantClasses[variant].active
-            : variantClasses[variant].inactive,
+            ? currentVariant.active
+            : currentVariant.inactive,
         className
       )}
     >

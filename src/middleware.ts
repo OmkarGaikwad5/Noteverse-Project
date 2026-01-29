@@ -19,9 +19,9 @@ export function middleware(request: NextRequest) {
         return NextResponse.redirect(new URL('/login', request.url));
     }
 
-    // 2. If trying to access login/signup while already logged in, redirect to home
+    // 2. If trying to access login/signup while already logged in, redirect to library
     if ((path === '/login' || path === '/signup') && token) {
-        return NextResponse.redirect(new URL('/home', request.url));
+        return NextResponse.redirect(new URL('/library', request.url));
     }
 
     return NextResponse.next();
@@ -34,6 +34,8 @@ export const config = {
         '/login',
         '/signup',
         '/home',
+        '/library',
+        '/notebook/:path*',
         '/note/:path*',
         // Match all paths except those starting with:
         // - _next/static (static files)
