@@ -35,6 +35,7 @@ export const config = {
         '/signup',
         '/home',
         '/library',
+        '/profile',
         '/notebook/:path*',
         '/note/:path*',
         // Match all paths except those starting with:
