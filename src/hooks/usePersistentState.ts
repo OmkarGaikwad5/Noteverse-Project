@@ -5,6 +5,8 @@ import { useSync } from '@/context/SyncContext';
 export function usePersistentState<T>(key: string, initialValue: T, noteId?: string) {
     const { registerChange } = useSync();
 
+    
+
     // Lazy initialization from localStorage
     const [state, setState] = useState<T>(() => {
         if (typeof window === 'undefined') return initialValue;
