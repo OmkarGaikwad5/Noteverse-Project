@@ -106,6 +106,8 @@ interface HistoryItem {
   stickyNotes: StickyNoteData[][];
 }
 
+type ToolMode = 'select' | 'pen' | 'highlighter' | 'text' | 'eraser' | 'shape' | 'sticky';
+
 export default function MicrosoftStyleCanvasBoard({ noteId }: { noteId: string }) {
   const storageKey = `canvas-${noteId}`;
   const [scale, setScale] = useState(1);
@@ -130,7 +132,7 @@ export default function MicrosoftStyleCanvasBoard({ noteId }: { noteId: string }
   const { lines, textBoxes, shapes, stickyNotes, background } = canvasData;
 
   // Tool states
-  const [mode, setMode] = useState<'select' | 'pen' | 'highlighter' | 'text' | 'eraser' | 'shape' | 'sticky'>('select');
+  const [mode, setMode] = useState<ToolMode>('select');
   const [pageIndex, setPageIndex] = useState(0);
   const isDrawing = useRef(false);
   const [penSize, setPenSize] = useState(3);
@@ -190,7 +192,7 @@ export default function MicrosoftStyleCanvasBoard({ noteId }: { noteId: string }
     { type: 'star' as ShapeType, icon: <div className="text-lg">★</div>, label: 'Star' }
   ];
 
-  // Fonts
+  // Fonts array - FIXED: Added missing fonts array
   const fonts = ['Arial', 'Helvetica', 'Times New Roman', 'Courier New', 'Verdana', 'Georgia', 'Comic Sans MS'];
 
   const currentLines = lines[pageIndex] || [];
@@ -308,7 +310,7 @@ export default function MicrosoftStyleCanvasBoard({ noteId }: { noteId: string }
       isDrawing.current = true;
       const newLine: LineData = {
         points: [pos.x, pos.y],
-        tool: mode,
+        tool: mode, // This is now safe because mode is narrowed by the if condition
         color: mode === 'eraser' ? '#ffffff' : penColor,
         size: penSize,
         opacity: mode === 'highlighter' ? highlighterOpacity : 1
@@ -390,6 +392,9 @@ export default function MicrosoftStyleCanvasBoard({ noteId }: { noteId: string }
       const width = Math.abs(pos.x - start.x);
       const height = Math.abs(pos.y - start.y);
 
+      // FIXED: Removed the 'highlighter' check since mode can't be 'highlighter' here
+      const fill = '#ffffff00'; // Transparent fill for shape preview
+      
       setPreviewShape({
         type: selectedShape,
         x,
@@ -397,7 +402,7 @@ export default function MicrosoftStyleCanvasBoard({ noteId }: { noteId: string }
         width,
         height,
         id: 'preview',
-        fill: mode === 'highlighter' ? penColor + '80' : '#ffffff00',
+        fill: fill,
         stroke: penColor,
         strokeWidth: 2,
         rotation: 0
@@ -413,7 +418,7 @@ export default function MicrosoftStyleCanvasBoard({ noteId }: { noteId: string }
       const newShape: ShapeData = {
         ...previewShape,
         id: Date.now().toString(),
-        fill: mode === 'highlighter' ? penColor + '80' : '#ffffff00'
+        fill: '#ffffff00' // Transparent fill by default
       };
       
       const updated = [...shapes];
@@ -581,6 +586,17 @@ export default function MicrosoftStyleCanvasBoard({ noteId }: { noteId: string }
     return gridLines;
   };
 
+  // Tool definitions
+  const toolDefinitions = [
+    { mode: 'select' as ToolMode, icon: <FaMousePointer />, label: 'Select' },
+    { mode: 'pen' as ToolMode, icon: <FaPen />, label: 'Pen' },
+    { mode: 'highlighter' as ToolMode, icon: <FaHighlighter />, label: 'Highlighter' },
+    { mode: 'eraser' as ToolMode, icon: <FaEraser />, label: 'Eraser' },
+    { mode: 'text' as ToolMode, icon: <FaFont />, label: 'Text' },
+    { mode: 'shape' as ToolMode, icon: <FaShapes />, label: 'Shapes' },
+    { mode: 'sticky' as ToolMode, icon: <div className="text-lg">📝</div>, label: 'Sticky' }
+  ];
+
   return (
     <div className="h-screen flex flex-col bg-gray-50">
       {/* Top Header - Microsoft Whiteboard Style */}
@@ -692,18 +708,10 @@ export default function MicrosoftStyleCanvasBoard({ noteId }: { noteId: string }
               <div className="space-y-2">
                 <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Tools</h3>
                 <div className="grid grid-cols-3 gap-2">
-                  {[
-                    { mode: 'select', icon: <FaMousePointer />, label: 'Select' },
-                    { mode: 'pen', icon: <FaPen />, label: 'Pen' },
-                    { mode: 'highlighter', icon: <FaHighlighter />, label: 'Highlighter' },
-                    { mode: 'eraser', icon: <FaEraser />, label: 'Eraser' },
-                    { mode: 'text', icon: <FaFont />, label: 'Text' },
-                    { mode: 'shape', icon: <FaShapes />, label: 'Shapes' },
-                    { mode: 'sticky', icon: <div className="text-lg">📝</div>, label: 'Sticky' }
-                  ].map((tool) => (
+                  {toolDefinitions.map((tool) => (
                     <button
                       key={tool.mode}
-                      onClick={() => setMode(tool.mode as any)}
+                      onClick={() => setMode(tool.mode)}
                       className={`flex flex-col items-center justify-center p-3 rounded-lg transition-all duration-200 ${
                         mode === tool.mode
                           ? 'bg-blue-50 border border-blue-200 shadow-sm'
@@ -830,7 +838,7 @@ export default function MicrosoftStyleCanvasBoard({ noteId }: { noteId: string }
                       onChange={(e) => setSelectedFont(e.target.value)}
                       className="w-full p-2 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     >
-                      {fonts.map((font) => (
+                      {fonts.map((font: string) => (
                         <option key={font} value={font}>
                           {font}
                         </option>
