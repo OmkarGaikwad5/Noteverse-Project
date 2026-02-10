@@ -107,10 +107,10 @@ export default function Home() {
             </div>
             
             <Link
-              href="/signup"
+              href="/home"
               className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-2 rounded-lg font-semibold hover:shadow-lg transition-all duration-300 hover:scale-105"
             >
-              Get Started Free
+              Get Started
             </Link>
           </div>
         </div>
@@ -141,7 +141,7 @@ export default function Home() {
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
               <Link
-                href="/signup"
+                href="/home"
                 className="group relative bg-gradient-to-r from-blue-600 to-purple-600 text-white px-8 py-4 rounded-xl font-semibold text-lg hover:shadow-2xl transition-all duration-300 hover:scale-105 flex items-center"
               >
                 Start Your Journey
@@ -151,7 +151,7 @@ export default function Home() {
                 href="/library"
                 className="bg-white text-gray-800 px-8 py-4 rounded-xl font-semibold text-lg border-2 border-gray-200 hover:border-blue-500 transition-all duration-300 hover:shadow-lg"
               >
-                Try Demo
+                Library
               </Link>
             </div>
             
