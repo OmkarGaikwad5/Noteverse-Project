@@ -2,8 +2,13 @@ import React from "react";
 import clsx from "clsx";
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+<<<<<<< HEAD
   variant?: "primary" | "secondary" | "ghost" | "outline" | "destructive";
   size?: "default" | "sm" | "lg" | "icon";
+=======
+  variant?: 'primary' | 'secondary' | 'ghost' | 'outline' | 'destructive';
+  size?: 'default' | 'sm' | 'lg' | 'icon';
+>>>>>>> 0b5108468edf3bc56c020e463b50e318f73f8c2e
   children: React.ReactNode;
   className?: string;
   active?: boolean;
@@ -39,6 +44,10 @@ function Button({
         "bg-primary text-primary-foreground hover:bg-primary/90 active:bg-primary/95",
       inactive:
         "bg-muted text-foreground hover:bg-muted-foreground/10 active:bg-muted-foreground/20",
+    },
+    destructive: {
+      active: 'bg-destructive text-destructive-foreground hover:bg-destructive/90 active:bg-destructive/95 focus-visible:ring-destructive',
+      inactive: 'bg-destructive text-destructive-foreground hover:bg-destructive/90 active:bg-destructive/95 focus-visible:ring-destructive',
     },
     secondary: {
       active:
