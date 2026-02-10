@@ -30,6 +30,18 @@ const nextConfig: NextConfig = {
       ...config.resolve.fallback,
       canvas: false,
     };
+
+    // Disable webpack persistent filesystem caching to avoid "Unable to snapshot resolve dependencies"
+    // errors on some CI/build environments. This keeps builds deterministic at the cost of cache speed.
+    try {
+      config.cache = false;
+    } catch (e) {
+      // If the config object is frozen or setting cache fails, ignore and continue
+      // (Next.js may manage cache differently across versions/environments).
+      // eslint-disable-next-line no-console
+      console.warn('Unable to set webpack cache flag:', e);
+    }
+
     return config;
   }
 };
