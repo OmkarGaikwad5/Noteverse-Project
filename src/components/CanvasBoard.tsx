@@ -1,814 +1,1253 @@
-
 'use client'
-import { Stage, Layer, Line, Text, Circle, Rect } from 'react-konva';
+import { Stage, Layer, Line, Text, Circle, Rect, Arrow, Transformer } from 'react-konva';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from '@/components/custom/button';
-import { FaPen, FaEraser, FaFont, FaTrash, FaPlus, FaArrowLeft, FaArrowRight, FaUndo, FaRedo, FaImage, FaMinus, FaShapes } from 'react-icons/fa';
+import { 
+  FaPen, 
+  FaEraser, 
+  FaFont, 
+  FaTrash, 
+  FaPlus, 
+  FaArrowLeft, 
+  FaArrowRight, 
+  FaUndo, 
+  FaRedo, 
+  FaImage, 
+  FaMinus, 
+  FaShapes,
+  FaMousePointer,
+  FaSquare,
+  FaCircle,
+  FaLongArrowAltRight,
+  FaHighlighter,
+  FaPalette,
+  FaExpand,
+  FaCompress,
+  FaCopy,
+  FaPaste,
+  FaSave,
+  FaShare,
+  FaRuler,
+  FaAlignLeft,
+  FaAlignCenter,
+  FaAlignRight,
+  FaBold,
+  FaItalic,
+  FaUnderline,
+  FaEye,
+  FaEyeSlash,
+  FaDownload
+} from 'react-icons/fa';
 import Konva from 'konva';
 import { usePersistentState } from '@/hooks/usePersistentState';
 
 interface LineData {
-    points: number[];
-    tool: 'pen' | 'eraser';
-    size: number;
+  points: number[];
+  tool: 'pen' | 'highlighter' | 'eraser';
+  color: string;
+  size: number;
+  opacity: number;
 }
 
-type ShapeType = 'circle' | 'rectangle' | 'line';
+type ShapeType = 'rectangle' | 'circle' | 'line' | 'arrow' | 'triangle' | 'star';
 
 interface ShapeData {
-    type: ShapeType;
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-    id: string;
-    draggable?: boolean;
+  type: ShapeType;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  id: string;
+  fill: string;
+  stroke: string;
+  strokeWidth: number;
+  rotation: number;
+  draggable?: boolean;
 }
+
 interface TextBoxData {
-    x: number;
-    y: number;
-    text: string;
-    id: string;
-    draggable?: boolean;
-    isEditing?: boolean;
+  x: number;
+  y: number;
+  text: string;
+  id: string;
+  fontSize: number;
+  fontFamily: string;
+  fill: string;
+  align: 'left' | 'center' | 'right';
+  bold: boolean;
+  italic: boolean;
+  underline: boolean;
+  width: number;
+  draggable?: boolean;
+  isEditing?: boolean;
 }
 
-export default function CanvasBoard({ noteId }: { noteId: string }) {
-    const storageKey = `canvasNotes-${noteId}`;
-    const [scale, setScale] = useState(1);
-    const [stagePos, setStagePos] = useState({ x: 0, y: 0 });
+interface StickyNoteData {
+  x: number;
+  y: number;
+  text: string;
+  id: string;
+  color: string;
+  width: number;
+  height: number;
+}
 
-    // Combined Persistent State
-    const [canvasData, setCanvasData] = usePersistentState(storageKey, {
-        lines: [[]] as LineData[][],
-        textBoxes: [[]] as TextBoxData[][],
-        shapes: [[]] as ShapeData[][]
-    }, noteId);
+interface GridSettings {
+  enabled: boolean;
+  size: number;
+  color: string;
+  opacity: number;
+}
 
-    // Destructure for ease of use
-    const lines = canvasData.lines || [[]];
-    const textBoxes = canvasData.textBoxes || [[]];
-    const shapes = canvasData.shapes || [[]];
+interface HistoryItem {
+  lines: LineData[][];
+  textBoxes: TextBoxData[][];
+  shapes: ShapeData[][];
+  stickyNotes: StickyNoteData[][];
+}
 
-    // Backward-compatible setters
-    const setLines = useCallback((updater: LineData[][] | ((prev: LineData[][]) => LineData[][])) => {
-        setCanvasData(prev => ({
-            ...prev,
-            lines: typeof updater === 'function' ? updater(prev.lines || [[]]) : updater
-        }));
-    }, [setCanvasData]);
+type ToolMode = 'select' | 'pen' | 'highlighter' | 'text' | 'eraser' | 'shape' | 'sticky';
 
-    const setTextBoxes = useCallback((updater: TextBoxData[][] | ((prev: TextBoxData[][]) => TextBoxData[][])) => {
-        setCanvasData(prev => ({
-            ...prev,
-            textBoxes: typeof updater === 'function' ? updater(prev.textBoxes || [[]]) : updater
-        }));
-    }, [setCanvasData]);
+export default function MicrosoftStyleCanvasBoard({ noteId }: { noteId: string }) {
+  const storageKey = `canvas-${noteId}`;
+  const [scale, setScale] = useState(1);
+  const [stagePos, setStagePos] = useState({ x: 0, y: 0 });
 
-    const setShapes = useCallback((updater: ShapeData[][] | ((prev: ShapeData[][]) => ShapeData[][])) => {
-        setCanvasData(prev => ({
-            ...prev,
-            shapes: typeof updater === 'function' ? updater(prev.shapes || [[]]) : updater
-        }));
-    }, [setCanvasData]);
+  // Combined Persistent State
+  const [canvasData, setCanvasData] = usePersistentState<{
+    lines: LineData[][];
+    textBoxes: TextBoxData[][];
+    shapes: ShapeData[][];
+    stickyNotes: StickyNoteData[][];
+    background: string;
+  }>(storageKey, {
+    lines: [[]],
+    textBoxes: [[]],
+    shapes: [[]],
+    stickyNotes: [[]],
+    background: '#ffffff'
+  }, noteId);
 
-    const [mode, setMode] = useState<'pen' | 'text' | 'eraser' | 'shape'>('pen');
-    const [pageIndex, setPageIndex] = useState(0);
-    const isDrawing = useRef(false);
-    const [penSize, setPenSize] = useState(4);
-    const undoStack = useRef<{ lines: LineData[][]; textBoxes: TextBoxData[][]; shapes: ShapeData[][] }[]>([]);
-    const redoStack = useRef<{ lines: LineData[][]; textBoxes: TextBoxData[][]; shapes: ShapeData[][] }[]>([]);
+  // Destructure for ease of use
+  const { lines, textBoxes, shapes, stickyNotes, background } = canvasData;
 
-    const [selectedShape, setSelectedShape] = useState<ShapeType>('rectangle'); // dropdown option
-    const shapeStart = useRef<{ x: number; y: number } | null>(null);
-    const stageRef = useRef<Konva.Stage | null>(null);
-    const [cursor, setCursor] = useState('crosshair');
-    const [previewShape, setPreviewShape] = useState<ShapeData | null>(null);
+  // Tool states
+  const [mode, setMode] = useState<ToolMode>('select');
+  const [pageIndex, setPageIndex] = useState(0);
+  const isDrawing = useRef(false);
+  const [penSize, setPenSize] = useState(3);
+  const [penColor, setPenColor] = useState('#000000');
+  const [highlighterOpacity, setHighlighterOpacity] = useState(0.3);
+  const [selectedShape, setSelectedShape] = useState<ShapeType>('rectangle');
+  const [selectedFont, setSelectedFont] = useState('Arial');
+  const [selectedFontSize, setSelectedFontSize] = useState(20);
+  const [textAlign, setTextAlign] = useState<'left' | 'center' | 'right'>('left');
+  const [textBold, setTextBold] = useState(false);
+  const [textItalic, setTextItalic] = useState(false);
+  const [textUnderline, setTextUnderline] = useState(false);
+  
+  // History management
+  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+  
+  // UI states
+  const [showToolbar, setShowToolbar] = useState(true);
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  const [showShapesMenu, setShowShapesMenu] = useState(false);
+  const [gridSettings, setGridSettings] = useState<GridSettings>({
+    enabled: false,
+    size: 20,
+    color: '#e0e0e0',
+    opacity: 0.5
+  });
+  
+  // Refs
+  const stageRef = useRef<Konva.Stage | null>(null);
+  const shapeStart = useRef<{ x: number; y: number } | null>(null);
+  const [selectedElement, setSelectedElement] = useState<{
+    type: 'shape' | 'text' | 'sticky';
+    id: string;
+  } | null>(null);
+  const [cursor, setCursor] = useState('default');
+  const [previewShape, setPreviewShape] = useState<ShapeData | null>(null);
+  const [stageSize, setStageSize] = useState({
+    width: typeof window !== 'undefined' ? window.innerWidth : 1920,
+    height: typeof window !== 'undefined' ? window.innerHeight : 1080
+  });
+  
+  // Colors palette
+  const colors = [
+    '#000000', '#1a1a1a', '#333333', '#4d4d4d', '#666666',
+    '#0078d4', '#107c10', '#d83b01', '#e3008c', '#008272',
+    '#ffb900', '#00bcf2', '#b4009e', '#5c2d91', '#00b294',
+    '#ffffff', '#f2f2f2', '#e6e6e6', '#d9d9d9', '#cccccc'
+  ];
 
-    const [stageSize, setStageSize] = useState({
-        width: typeof window !== 'undefined' ? window.innerWidth : 1080,
-        height: 1800
+  const shapesList = [
+    { type: 'rectangle' as ShapeType, icon: <FaSquare />, label: 'Rectangle' },
+    { type: 'circle' as ShapeType, icon: <FaCircle />, label: 'Circle' },
+    { type: 'line' as ShapeType, icon: <div className="w-4 h-0.5 bg-current" />, label: 'Line' },
+    { type: 'arrow' as ShapeType, icon: <FaLongArrowAltRight />, label: 'Arrow' },
+    { type: 'triangle' as ShapeType, icon: <div className="w-0 h-0 border-l-[8px] border-r-[8px] border-b-[12px] border-transparent border-b-current" />, label: 'Triangle' },
+    { type: 'star' as ShapeType, icon: <div className="text-lg">★</div>, label: 'Star' }
+  ];
+
+  // Fonts array - FIXED: Added missing fonts array
+  const fonts = ['Arial', 'Helvetica', 'Times New Roman', 'Courier New', 'Verdana', 'Georgia', 'Comic Sans MS'];
+
+  const currentLines = lines[pageIndex] || [];
+  const currentTextBoxes = textBoxes[pageIndex] || [];
+  const currentShapes = shapes[pageIndex] || [];
+  const currentStickyNotes = stickyNotes[pageIndex] || [];
+
+  // Initialize history
+  useEffect(() => {
+    pushHistory();
+  }, []);
+
+  // Update cursor
+  useEffect(() => {
+    switch (mode) {
+      case 'select':
+        setCursor('default');
+        break;
+      case 'pen':
+      case 'highlighter':
+        setCursor(`url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='${penSize * 2}' height='${penSize * 2}' viewBox='0 0 ${penSize * 2} ${penSize * 2}'%3E%3Ccircle cx='${penSize}' cy='${penSize}' r='${penSize}' fill='${penColor.replace('#', '%23')}' stroke='black' stroke-width='1'/%3E%3C/svg%3E") ${penSize} ${penSize}, auto`);
+        break;
+      case 'eraser':
+        setCursor(`url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='${penSize * 2}' height='${penSize * 2}' viewBox='0 0 ${penSize * 2} ${penSize * 2}'%3E%3Ccircle cx='${penSize}' cy='${penSize}' r='${penSize}' fill='white' stroke='black' stroke-width='1'/%3E%3C/svg%3E") ${penSize} ${penSize}, auto`);
+        break;
+      case 'text':
+        setCursor('text');
+        break;
+      case 'shape':
+        setCursor('crosshair');
+        break;
+      case 'sticky':
+        setCursor('pointer');
+        break;
+    }
+  }, [mode, penSize, penColor]);
+
+  // Handle window resize
+  useEffect(() => {
+    const handleResize = () => {
+      setStageSize({
+        width: window.innerWidth - (showToolbar ? 256 : 0),
+        height: window.innerHeight - 64
+      });
+    };
+
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [showToolbar]);
+
+  // History management
+  const pushHistory = useCallback(() => {
+    const newHistory = [...history.slice(0, historyIndex + 1), {
+      lines: JSON.parse(JSON.stringify(lines)),
+      textBoxes: JSON.parse(JSON.stringify(textBoxes)),
+      shapes: JSON.parse(JSON.stringify(shapes)),
+      stickyNotes: JSON.parse(JSON.stringify(stickyNotes))
+    }];
+    setHistory(newHistory);
+    setHistoryIndex(newHistory.length - 1);
+  }, [history, historyIndex, lines, textBoxes, shapes, stickyNotes]);
+
+  const undo = () => {
+    if (historyIndex > 0) {
+      const prevState = history[historyIndex - 1];
+      setCanvasData(prev => ({
+        ...prev,
+        lines: prevState.lines,
+        textBoxes: prevState.textBoxes,
+        shapes: prevState.shapes,
+        stickyNotes: prevState.stickyNotes
+      }));
+      setHistoryIndex(historyIndex - 1);
+    }
+  };
+
+  const redo = () => {
+    if (historyIndex < history.length - 1) {
+      const nextState = history[historyIndex + 1];
+      setCanvasData(prev => ({
+        ...prev,
+        lines: nextState.lines,
+        textBoxes: nextState.textBoxes,
+        shapes: nextState.shapes,
+        stickyNotes: nextState.stickyNotes
+      }));
+      setHistoryIndex(historyIndex + 1);
+    }
+  };
+
+  // Handle mouse events
+  const handleMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    const stage = e.target.getStage();
+    if (!stage) return;
+    
+    const pointer = stage.getPointerPosition();
+    if (!pointer) return;
+    
+    const pos = {
+      x: (pointer.x - stage.x()) / stage.scaleX(),
+      y: (pointer.y - stage.y()) / stage.scaleY(),
+    };
+
+    if (mode === 'select') {
+      // Clear selection if clicking on empty space
+      if (e.target === stage) {
+        setSelectedElement(null);
+      }
+      return;
+    }
+
+    if (mode === 'pen' || mode === 'highlighter' || mode === 'eraser') {
+      pushHistory();
+      isDrawing.current = true;
+      const newLine: LineData = {
+        points: [pos.x, pos.y],
+        tool: mode, // This is now safe because mode is narrowed by the if condition
+        color: mode === 'eraser' ? '#ffffff' : penColor,
+        size: penSize,
+        opacity: mode === 'highlighter' ? highlighterOpacity : 1
+      };
+      
+      const updated = [...lines];
+      updated[pageIndex] = [...currentLines, newLine];
+      setCanvasData(prev => ({ ...prev, lines: updated }));
+    } else if (mode === 'shape') {
+      shapeStart.current = { x: pos.x, y: pos.y };
+    } else if (mode === 'text') {
+      pushHistory();
+      const newTextBox: TextBoxData = {
+        x: pos.x,
+        y: pos.y,
+        text: 'Click to type...',
+        id: Date.now().toString(),
+        fontSize: selectedFontSize,
+        fontFamily: selectedFont,
+        fill: penColor,
+        align: textAlign,
+        bold: textBold,
+        italic: textItalic,
+        underline: textUnderline,
+        width: 200,
+        isEditing: true
+      };
+      
+      const updated = [...textBoxes];
+      updated[pageIndex] = [...currentTextBoxes, newTextBox];
+      setCanvasData(prev => ({ ...prev, textBoxes: updated }));
+    } else if (mode === 'sticky') {
+      pushHistory();
+      const newSticky: StickyNoteData = {
+        x: pos.x,
+        y: pos.y,
+        text: 'Double click to edit',
+        id: Date.now().toString(),
+        color: colors[Math.floor(Math.random() * 5) + 10],
+        width: 200,
+        height: 150
+      };
+      
+      const updated = [...stickyNotes];
+      updated[pageIndex] = [...currentStickyNotes, newSticky];
+      setCanvasData(prev => ({ ...prev, stickyNotes: updated }));
+    }
+  };
+
+  const handleMouseMove = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    if (!isDrawing.current && mode !== 'shape') return;
+    
+    const stage = e.target.getStage();
+    if (!stage) return;
+    
+    const pointer = stage.getPointerPosition();
+    if (!pointer) return;
+    
+    const pos = {
+      x: (pointer.x - stage.x()) / stage.scaleX(),
+      y: (pointer.y - stage.y()) / stage.scaleY(),
+    };
+
+    if (isDrawing.current && (mode === 'pen' || mode === 'highlighter' || mode === 'eraser')) {
+      const updated = [...lines];
+      const current = [...currentLines];
+      
+      if (current.length === 0) return;
+      
+      const lastLine = { ...current[current.length - 1] };
+      lastLine.points = [...lastLine.points, pos.x, pos.y];
+      current[current.length - 1] = lastLine;
+      updated[pageIndex] = current;
+      setCanvasData(prev => ({ ...prev, lines: updated }));
+    } else if (mode === 'shape' && shapeStart.current) {
+      const start = shapeStart.current;
+      const x = Math.min(start.x, pos.x);
+      const y = Math.min(start.y, pos.y);
+      const width = Math.abs(pos.x - start.x);
+      const height = Math.abs(pos.y - start.y);
+
+      // FIXED: Removed the 'highlighter' check since mode can't be 'highlighter' here
+      const fill = '#ffffff00'; // Transparent fill for shape preview
+      
+      setPreviewShape({
+        type: selectedShape,
+        x,
+        y,
+        width,
+        height,
+        id: 'preview',
+        fill: fill,
+        stroke: penColor,
+        strokeWidth: 2,
+        rotation: 0
+      });
+    }
+  };
+
+  const handleMouseUp = () => {
+    isDrawing.current = false;
+    
+    if (mode === 'shape' && shapeStart.current && previewShape) {
+      pushHistory();
+      const newShape: ShapeData = {
+        ...previewShape,
+        id: Date.now().toString(),
+        fill: '#ffffff00' // Transparent fill by default
+      };
+      
+      const updated = [...shapes];
+      updated[pageIndex] = [...currentShapes, newShape];
+      setCanvasData(prev => ({ ...prev, shapes: updated }));
+      shapeStart.current = null;
+      setPreviewShape(null);
+    }
+  };
+
+  const handleWheel = (e: Konva.KonvaEventObject<WheelEvent>) => {
+    e.evt.preventDefault();
+    const stage = stageRef.current;
+    
+    if (!stage) return;
+    
+    const pointer = stage.getPointerPosition();
+    if (!pointer) return;
+
+    const isCtrlPressed = e.evt.ctrlKey || e.evt.metaKey;
+    
+    if (isCtrlPressed) {
+      // Zoom
+      const scaleBy = 1.1;
+      const oldScale = scale;
+      const direction = e.evt.deltaY > 0 ? -1 : 1;
+      let newScale = direction > 0 ? oldScale * scaleBy : oldScale / scaleBy;
+      
+      newScale = Math.max(0.1, Math.min(5, newScale));
+      
+      const mousePointTo = {
+        x: (pointer.x - stage.x()) / oldScale,
+        y: (pointer.y - stage.y()) / oldScale,
+      };
+      
+      const newPos = {
+        x: pointer.x - mousePointTo.x * newScale,
+        y: pointer.y - mousePointTo.y * newScale,
+      };
+      
+      setScale(newScale);
+      setStagePos(newPos);
+    } else {
+      // Pan
+      const dx = e.evt.deltaX;
+      const dy = e.evt.deltaY;
+      
+      setStagePos(prev => ({
+        x: prev.x - dx,
+        y: prev.y - dy,
+      }));
+    }
+  };
+
+  // Toolbar functions
+  const addPage = () => {
+    pushHistory();
+    setCanvasData(prev => ({
+      ...prev,
+      lines: [...lines, []],
+      textBoxes: [...textBoxes, []],
+      shapes: [...shapes, []],
+      stickyNotes: [...stickyNotes, []]
+    }));
+    setPageIndex(lines.length);
+  };
+
+  const deletePage = () => {
+    if (lines.length <= 1) return;
+    
+    pushHistory();
+    const updatedLines = lines.filter((_, i) => i !== pageIndex);
+    const updatedText = textBoxes.filter((_, i) => i !== pageIndex);
+    const updatedShapes = shapes.filter((_, i) => i !== pageIndex);
+    const updatedSticky = stickyNotes.filter((_, i) => i !== pageIndex);
+    
+    setCanvasData(prev => ({
+      ...prev,
+      lines: updatedLines,
+      textBoxes: updatedText,
+      shapes: updatedShapes,
+      stickyNotes: updatedSticky
+    }));
+    
+    setPageIndex(Math.max(0, pageIndex - 1));
+  };
+
+  const clearPage = () => {
+    pushHistory();
+    const updatedLines = [...lines];
+    const updatedText = [...textBoxes];
+    const updatedShapes = [...shapes];
+    const updatedSticky = [...stickyNotes];
+    
+    updatedLines[pageIndex] = [];
+    updatedText[pageIndex] = [];
+    updatedShapes[pageIndex] = [];
+    updatedSticky[pageIndex] = [];
+    
+    setCanvasData(prev => ({
+      ...prev,
+      lines: updatedLines,
+      textBoxes: updatedText,
+      shapes: updatedShapes,
+      stickyNotes: updatedSticky
+    }));
+  };
+
+  const changeBackground = (color: string) => {
+    pushHistory();
+    setCanvasData(prev => ({ ...prev, background: color }));
+  };
+
+  const exportCanvas = () => {
+    const stage = stageRef.current;
+    if (!stage) return;
+
+    const dataUrl = stage.toDataURL({
+      mimeType: 'image/png',
+      quality: 1,
+      pixelRatio: 2
     });
-    const [selectedShapeId, setSelectedShapeId] = useState<string | null>(null);
-    const textInputRef = useRef<HTMLTextAreaElement>(null);
+    
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = `canvas-${pageIndex + 1}-${Date.now()}.png`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
 
-    const currentLines = lines[pageIndex] || [];
-    const currentTextBoxes = textBoxes[pageIndex] || [];
+  // Render grid
+  const renderGrid = () => {
+    if (!gridSettings.enabled) return null;
+    
+    const gridSize = gridSettings.size;
+    const gridLines = [];
+    const width = stageSize.width;
+    const height = stageSize.height;
+    
+    for (let i = 0; i < width / gridSize; i++) {
+      gridLines.push(
+        <Line
+          key={`v-${i}`}
+          points={[i * gridSize, 0, i * gridSize, height]}
+          stroke={gridSettings.color}
+          strokeWidth={1}
+          opacity={gridSettings.opacity}
+        />
+      );
+    }
+    
+    for (let i = 0; i < height / gridSize; i++) {
+      gridLines.push(
+        <Line
+          key={`h-${i}`}
+          points={[0, i * gridSize, width, i * gridSize]}
+          stroke={gridSettings.color}
+          strokeWidth={1}
+          opacity={gridSettings.opacity}
+        />
+      );
+    }
+    
+    return gridLines;
+  };
 
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === 'Delete' && selectedShapeId) {
-                const updatedShapes = [...shapes];
-                updatedShapes[pageIndex] = (shapes[pageIndex] || []).filter(
-                    shape => shape.id !== selectedShapeId
-                );
-                setShapes(updatedShapes);
-                setSelectedShapeId(null);
-            }
-        };
+  // Tool definitions
+  const toolDefinitions = [
+    { mode: 'select' as ToolMode, icon: <FaMousePointer />, label: 'Select' },
+    { mode: 'pen' as ToolMode, icon: <FaPen />, label: 'Pen' },
+    { mode: 'highlighter' as ToolMode, icon: <FaHighlighter />, label: 'Highlighter' },
+    { mode: 'eraser' as ToolMode, icon: <FaEraser />, label: 'Eraser' },
+    { mode: 'text' as ToolMode, icon: <FaFont />, label: 'Text' },
+    { mode: 'shape' as ToolMode, icon: <FaShapes />, label: 'Shapes' },
+    { mode: 'sticky' as ToolMode, icon: <div className="text-lg">📝</div>, label: 'Sticky' }
+  ];
 
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [selectedShapeId, shapes, pageIndex, setShapes]); // setShapes is stable but included for completeness
-
-    useEffect(() => {
-        document.title = "Note - Canvas"
-    }, []);
-
-    // Removed manual localStorage effect
-
-    useEffect(() => {
-        switch (mode) {
-            case 'pen':
-                setCursor('crosshair');
-                break;
-            case 'eraser':
-                setCursor(`url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='${penSize * 2}' height='${penSize * 2}' viewBox='0 0 ${penSize * 2} ${penSize * 2}'%3E%3Ccircle cx='${penSize}' cy='${penSize}' r='${penSize}' fill='white' stroke='black' stroke-width='1'/%3E%3C/svg%3E") ${penSize} ${penSize}, auto`);
-                break;
-            case 'text':
-                setCursor('text');
-                break;
-            case 'shape':
-                setCursor('crosshair');
-                break;
-            default:
-                setCursor('default');
-        }
-    }, [mode, penSize]);
-
-    const pushUndo = () => {
-        undoStack.current.push({
-            lines: JSON.parse(JSON.stringify(lines)),
-            textBoxes: JSON.parse(JSON.stringify(textBoxes)),
-            shapes: JSON.parse(JSON.stringify(shapes))
-        });
-        redoStack.current = [];
-    };
-
-    const handleWheel = (e: Konva.KonvaEventObject<WheelEvent>) => {
-        e.evt.preventDefault();
-        const stage = stageRef.current;
-
-        if (!stage) return;
-        const pointer = stage.getPointerPosition();
-        if (!pointer) return;
-
-        const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-        const isCtrlPressed = e.evt.ctrlKey;
-        const deltaY = e.evt.deltaY;
-
-        const scaleBy = 1.05;
-
-        // 1. Handle zooming (pinch gesture or ctrl+scroll)
-        if (isCtrlPressed || (isMac && e.evt.metaKey)) {
-            const oldScale = scale;
-            const direction = deltaY > 0 ? -1 : 1;
-            let newScale = direction > 0 ? oldScale * scaleBy : oldScale / scaleBy;
-
-            newScale = Math.max(0.3, Math.min(5, newScale));
-
-            const mousePointTo = {
-                x: (pointer.x - stage.x()) / oldScale,
-                y: (pointer.y - stage.y()) / oldScale,
-            };
-
-            const newPos = {
-                x: pointer.x - mousePointTo.x * newScale,
-                y: pointer.y - mousePointTo.y * newScale,
-            };
-
-            setScale(newScale);
-            setStagePos(newPos);
-            return;
-        }
-
-        // 2. Handle two-finger pan (trackpad or shift+scroll)
-        const dx = e.evt.deltaX;
-        const dy = e.evt.deltaY;
-
-        setStagePos(prev => ({
-            x: prev.x - dx,
-            y: prev.y - dy,
-        }));
-    };
-
-
-    const undo = () => {
-        if (undoStack.current.length === 0) return;
-        redoStack.current.push({ lines, textBoxes, shapes });
-        const last = undoStack.current.pop();
-        if (last) {
-            setLines(last.lines);
-            setTextBoxes(last.textBoxes);
-            setShapes(last.shapes);
-        }
-    };
-
-    const redo = () => {
-        if (redoStack.current.length === 0) return;
-        undoStack.current.push({ lines, textBoxes, shapes });
-        const next = redoStack.current.pop();
-        if (next) {
-            setLines(next.lines);
-            setTextBoxes(next.textBoxes);
-            setShapes(next.shapes);
-        }
-    };
-
-    const handleTextClick = (id: string) => {
-        const updated = [...textBoxes];
-        updated[pageIndex] = currentTextBoxes.map((box) => ({
-            ...box,
-            isEditing: box.id === id
-        }));
-        setTextBoxes(updated);
-
-        // Focus the text input if it exists
-        setTimeout(() => {
-            if (textInputRef.current) {
-                textInputRef.current.focus();
-                textInputRef.current.select();
-            }
-        }, 0);
-    };
-
-    const handleTextChange = (id: string, newText: string) => {
-        const updated = [...textBoxes];
-        updated[pageIndex] = currentTextBoxes.map((box) =>
-            box.id === id ? { ...box, text: newText } : box
-        );
-        setTextBoxes(updated);
-    };
-
-    const handleTextBlur = () => {
-        const updated = [...textBoxes];
-        updated[pageIndex] = currentTextBoxes.map((box) => ({
-            ...box,
-            isEditing: false
-        }));
-        setTextBoxes(updated);
-    };
-
-    const handleMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
-        if (e.target === e.target.getStage()) {
-            setSelectedShapeId(null);
-        }
-        const stage = e.target.getStage();
-        if (!stage) return;
-        const pointer = stage.getPointerPosition();
-        if (!pointer) return;
-        const pos = {
-            x: (pointer.x - stage.x()) / stage.scaleX(),
-            y: (pointer.y - stage.y()) / stage.scaleY(),
-        };
-
-        if (mode === 'shape') {
-            shapeStart.current = { x: pos.x, y: pos.y };
-        }
-
-        if (mode === 'pen' || mode === 'eraser') {
-            pushUndo();
-            isDrawing.current = true;
-            const updated = [...lines];
-            const newLine = {
-                points: [pos.x, pos.y],
-                tool: mode,
-                size: penSize
-            };
-            updated[pageIndex] = [...(currentLines || []), newLine];
-            setLines(updated);
-        } else if (mode === 'text') {
-            // Only create new text box if we're not clicking on an existing one
-            const clickedOnText = currentTextBoxes.some(box =>
-                box.isEditing ||
-                (pos.x >= box.x && pos.x <= box.x + 100 &&
-                    pos.y >= box.y && pos.y <= box.y + 30)
-            );
-
-            if (!clickedOnText) {
-                pushUndo();
-                const updated = [...textBoxes];
-                const newTextBox = {
-                    x: pos.x,
-                    y: pos.y,
-                    text: 'Double click to edit',
-                    id: Date.now().toString(),
-                    isEditing: true
-                };
-                updated[pageIndex] = [...(currentTextBoxes || []), newTextBox];
-                setTextBoxes(updated);
-
-                // Focus the new text input
-                setTimeout(() => {
-                    if (textInputRef.current) {
-                        textInputRef.current.focus();
-                        textInputRef.current.select();
-                    }
-                }, 0);
-            }
-        }
-    };
-
-    const handleMouseMove = (e: Konva.KonvaEventObject<MouseEvent>) => {
-        const stage = e.target.getStage();
-        if (!stage) return;
-        const pointer = stage.getPointerPosition();
-        if (!pointer) return;
-        const pos = {
-            x: (pointer.x - stage.x()) / stage.scaleX(),
-            y: (pointer.y - stage.y()) / stage.scaleY(),
-        };
-
-        // Handle pen/eraser drawing
-        if (isDrawing.current && (mode === 'pen' || mode === 'eraser')) {
-            const updated = [...lines];
-            const current = [...(currentLines || [])];
-
-            if (current.length === 0) return;
-
-            const lastLine = { ...current[current.length - 1] };
-            lastLine.points = [...lastLine.points, pos.x, pos.y];
-            current[current.length - 1] = lastLine;
-            updated[pageIndex] = current;
-            setLines(updated);
-        }
-
-        // Handle shape preview while drawing
-        if (mode === 'shape' && shapeStart.current) {
-            const start = shapeStart.current;
-            const x = Math.min(start.x, pos.x);
-            const y = Math.min(start.y, pos.y);
-            const width = Math.abs(pos.x - start.x);
-            const height = Math.abs(pos.y - start.y);
-
-            setPreviewShape({
-                type: selectedShape,
-                x,
-                y,
-                width,
-                height,
-                id: 'preview',
-            });
-        }
-    };
-
-    const handleMouseUp = () => {
-        isDrawing.current = false;
-        if (mode === 'shape' && shapeStart.current && previewShape) {
-            pushUndo();
-            const updatedShapes = [...shapes];
-            updatedShapes[pageIndex] = [...(shapes[pageIndex] || []), {
-                ...previewShape,
-                id: Date.now().toString(),
-            }];
-            setShapes(updatedShapes);
-            shapeStart.current = null;
-            setPreviewShape(null);
-        }
-    };
-    const handleClear = () => {
-        pushUndo();
-        const updatedLines = [...lines];
-        const updatedText = [...textBoxes];
-        const updatedShapes = [...shapes];
-        updatedLines[pageIndex] = [];
-        updatedText[pageIndex] = [];
-        updatedShapes[pageIndex] = [];
-        setLines(updatedLines);
-        setTextBoxes(updatedText);
-        setShapes(updatedShapes);
-    };
-
-    const handleDragText = (id: string, pos: { x: number; y: number }) => {
-        const updated = [...textBoxes];
-        updated[pageIndex] = (currentTextBoxes || []).map((box) =>
-            box.id === id ? { ...box, x: pos.x, y: pos.y } : box
-        );
-        setTextBoxes(updated);
-    };
-
-    const addPage = () => {
-        pushUndo();
-        setLines([...lines, []]);
-        setTextBoxes([...textBoxes, []]);
-        setPageIndex(lines.length);
-    };
-
-    const prevPage = () => {
-        if (pageIndex > 0) setPageIndex(pageIndex - 1);
-    };
-
-    const nextPage = () => {
-        if (pageIndex < lines.length - 1) setPageIndex(pageIndex + 1);
-    };
-
-    const exportImage = () => {
-        const stage = stageRef.current;
-        if (!stage) return;
-
-        const dataUrl = stage.toDataURL({
-            mimeType: 'image/png',
-            quality: 1,
-        });
-        const a = document.createElement('a');
-        a.href = dataUrl;
-        a.download = `note-page-${pageIndex + 1}.png`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-    };
-
-    useEffect(() => {
-        const handleResize = () => {
-            setStageSize({
-                width: window.innerWidth,
-                height: window.innerWidth * (1800 / 1080)
-            });
-        };
-
-        handleResize();
-        window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
-    }, []);
-
-    return (
-        <div
-            className="p-4">
-            <div className="fixed top-4 left-4 z-50">
-                <div className="bg-surface rounded-lg shadow-xl border border-border overflow-hidden">
-                    {/* Main toolbar */}
-                    <div className="p-2 flex flex-wrap gap-1 max-w-xs">
-                        {/* Tools section */}
-                        <div className="flex gap-1 p-1 border-b border-border/50">
-                            <Button
-                                onClick={() => setMode('pen')}
-                                variant={mode === 'pen' ? 'secondary' : 'ghost'}
-                                className="h-8 w-8 p-0"
-                                title="Pen"
-                            >
-                                <FaPen className="text-sm text-ink-primary" />
-                            </Button>
-                            <Button
-                                onClick={() => setMode('eraser')}
-                                variant={mode === 'eraser' ? 'secondary' : 'ghost'}
-
-                                className="h-8 w-8 p-0"
-                                title="Eraser"
-                            >
-                                <FaEraser className="text-sm text-ink-primary" />
-                            </Button>
-                            <Button
-                                onClick={() => setMode('text')}
-                                variant={mode === 'text' ? 'secondary' : 'ghost'}
-
-                                className="h-8 w-8 p-0"
-                                title="Text"
-                            >
-                                <FaFont className="text-sm text-ink-primary" />
-                            </Button>
-                        </div>
-
-                        {/* Pen size controls */}
-                        <div className="flex items-center gap-2 p-2 border-b border-border/50">
-                            <div className="flex-shrink-0 text-xs text-ink-secondary">Size</div>
-                            <input
-                                type="range"
-                                min={1}
-                                max={15}
-                                value={penSize}
-                                onChange={(e) => setPenSize(Number(e.target.value))}
-                                className="w-20 h-1 rounded-full appearance-none bg-background accent-primary"
-                            />
-                            <div className="text-xs w-4 text-center text-ink-primary">{penSize}</div>
-                        </div>
-
-                        {/* Page navigation */}
-                        <div className="flex gap-1 p-1 border-b border-border/50">
-                            <Button
-                                onClick={prevPage}
-                                disabled={pageIndex === 0}
-
-                                variant="ghost"
-                                className="h-8 w-8 p-0"
-                                title="Previous page"
-                            >
-                                <FaArrowLeft className="text-sm text-ink-primary" />
-                            </Button>
-                            <div className="flex items-center px-2 text-sm text-ink-primary">
-                                {pageIndex + 1}/{lines.length}
-                            </div>
-                            <Button
-                                onClick={nextPage}
-                                disabled={pageIndex === lines.length - 1}
-
-                                variant="ghost"
-                                className="h-8 w-8 p-0"
-                                title="Next page"
-                            >
-                                <FaArrowRight className="text-sm text-ink-primary" />
-                            </Button>
-                            <Button
-                                onClick={addPage}
-                                variant="ghost"
-                                className="h-8 w-8 p-0"
-                                title="Add page"
-                            >
-                                <FaPlus className="text-sm text-ink-primary" />
-                            </Button>
-                        </div>
-                        <div className='flex gap-1 p-1'>
-                            <Button
-                                onClick={() => setMode('shape')}
-                                variant={mode === 'shape' ? 'secondary' : 'ghost'}
-                                // className="flex items-center gap-2"
-                                className="h-8 w-8 p-0"
-                            >
-                                <FaShapes className="text-sm text-ink-primary" />
-                            </Button>
-                            <select
-                                value={selectedShape}
-                                onChange={(e) => setSelectedShape(e.target.value as ShapeType)}
-                                className="ml-2 border border-border rounded p-1 bg-surface text-ink-primary text-xs"
-                            >
-                                <option value="rectangle">Rectangle</option>
-                                <option value="circle">Circle</option>
-                                <option value="line">Line</option>
-                            </select>
-                            <Button
-                                onClick={() => {
-                                    if (selectedShapeId) {
-                                        pushUndo();
-                                        const updatedShapes = [...shapes];
-                                        updatedShapes[pageIndex] = (shapes[pageIndex] || []).filter(
-                                            shape => shape.id !== selectedShapeId
-                                        );
-                                        setShapes(updatedShapes);
-                                        setSelectedShapeId(null);
-                                    }
-                                }}
-                                disabled={!selectedShapeId}
-                                variant="ghost"
-                                className="h-8 w-8 p-0"
-                                title="Delete selected shape"
-                            >
-                                <FaTrash className="text-sm text-coral" />
-                            </Button>
-                        </div>
-
-                        {/* Actions */}
-                        <div className="flex gap-1 p-1">
-                            <Button
-                                onClick={undo}
-
-                                variant="ghost"
-                                className="h-8 w-8 p-0"
-                                title="Undo"
-                            >
-                                <FaUndo className="text-sm text-ink-primary" />
-                            </Button>
-                            <Button
-                                onClick={redo}
-
-                                variant="ghost"
-                                className="h-8 w-8 p-0"
-                                title="Redo"
-                            >
-                                <FaRedo className="text-sm text-ink-primary" />
-                            </Button>
-                            <Button
-                                onClick={handleClear}
-
-                                variant="ghost"
-                                className="h-8 w-8 p-0"
-                                title="Clear page"
-                            >
-                                <FaTrash className="text-sm text-coral" />
-                            </Button>
-                            <Button
-                                onClick={exportImage}
-
-                                variant="ghost"
-                                className="h-8 w-8 p-0"
-                                title="Export"
-                            >
-                                <FaImage className="text-sm text-ink-primary" />
-                            </Button>
-                        </div>
-
-                        {/* Zoom controls */}
-                        <div className="flex gap-1 p-1 border-t border-border/50">
-                            <Button
-                                onClick={() => setScale(prev => Math.max(prev / 1.1, 0.3))}
-
-                                variant="ghost"
-                                className="h-8 w-8 p-0"
-                                title="Zoom Out"
-                            >
-                                <FaMinus className="text-sm text-ink-primary" />
-                            </Button>
-                            <div className="flex items-center px-2 text-xs text-ink-primary">
-                                {Math.round(scale * 100)}%
-                            </div>
-                            <Button
-                                onClick={() => setScale(prev => Math.min(prev * 1.1, 4))}
-                                variant="ghost"
-                                className="h-8 w-8 p-0"
-                                title="Zoom In"
-                            >
-                                <FaPlus className="text-sm text-ink-primary" />
-                            </Button>
-                            <Button
-                                onClick={() => {
-                                    setScale(1);
-                                    setStagePos({ x: 0, y: 0 });
-                                }}
-
-                                variant="ghost"
-                                className="h-8 w-8 p-0"
-                                title="Reset Zoom"
-                            >
-                                <span className="text-xs text-ink-secondary">1:1</span>
-                            </Button>
-                        </div>
-                    </div>
-                </div>
+  return (
+    <div className="h-screen flex flex-col bg-gray-50">
+      {/* Top Header - Microsoft Whiteboard Style */}
+      <div className="flex items-center justify-between px-4 py-2 bg-white border-b border-gray-200 shadow-sm">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center">
+              <span className="text-white font-bold">NV</span>
             </div>
-            <Stage
-                ref={stageRef}
-                height={stageSize.height}
-                width={stageSize.width}
-                scaleX={scale}
-                scaleY={scale}
-                x={stagePos.x}
-                y={stagePos.y}
-                onWheel={handleWheel}
-                onMouseDown={handleMouseDown}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
-                className=""
-                style={{ cursor }}
+            <span className="font-semibold text-gray-800">NoteVerse Whiteboard</span>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={undo}
+              disabled={historyIndex <= 0}
+              className="gap-2 hover:bg-gray-100"
             >
-                <Layer>
-                    {currentLines.map((line, i) => (
-                        <Line
-                            key={i}
-                            points={line.points}
-                            stroke={line.tool === 'eraser' ? '#fff' : '#000'}
-                            strokeWidth={line.size}
-                            tension={0.8}
-                            lineCap="round"
-                            lineJoin="round"
-                            globalCompositeOperation={line.tool === 'eraser' ? 'destination-out' : 'source-over'}
-                        />
-                    ))}
-                    {(shapes[pageIndex] || []).map((shape) => {
-                        const isSelected = shape.id === selectedShapeId;
-                        const someKey = shape.id;
-                        const commonProps = {
-                            draggable: true,
-                            onClick: (e: Konva.KonvaEventObject<MouseEvent>) => {
-                                e.cancelBubble = true; // Prevent event from reaching stage
-                                setSelectedShapeId(shape.id);
-                                setMode("pen")
-                            },
-                            onDragEnd: (e: Konva.KonvaEventObject<DragEvent>) => {
-                                const updatedShapes = [...shapes];
-                                updatedShapes[pageIndex] = (shapes[pageIndex] || []).map(s =>
-                                    s.id === shape.id ? {
-                                        ...s,
-                                        x: e.target.x(),
-                                        y: e.target.y()
-                                    } : s
-                                );
-                                setShapes(updatedShapes);
-                            },
-                            stroke: isSelected ? 'blue' : 'black',
-                            strokeWidth: isSelected ? 3 : 2,
-                        };
-
-                        if (shape.type === 'rectangle') {
-                            return (
-                                <Rect
-                                    key={someKey}
-                                    {...commonProps}
-                                    x={shape.x}
-                                    y={shape.y}
-                                    width={shape.width}
-                                    height={shape.height}
-                                />
-                            );
-                        } else if (shape.type === 'circle') {
-                            return (
-                                <Circle
-                                    key={someKey}
-                                    {...commonProps}
-                                    x={shape.x + shape.width / 2}
-                                    y={shape.y + shape.height / 2}
-                                    radius={Math.min(shape.width, shape.height) / 2}
-                                />
-                            );
-                        } else if (shape.type === 'line') {
-                            return (
-                                <Line
-                                    key={someKey}
-                                    {...commonProps}
-                                    points={[shape.x, shape.y, shape.x + shape.width, shape.y + shape.height]}
-                                    lineCap="round"
-                                />
-                            );
-                        }
-                        return null;
-                    })}
-                    {currentTextBoxes.map((box) => (
-                        box.isEditing ? (
-                            <Text
-                                key={box.id}
-                                x={box.x}
-                                y={box.y}
-                                text={box.text}
-                                fontSize={20}
-                                fill="#000"
-                                onClick={() => handleTextClick(box.id)}
-                                onDblClick={() => handleTextClick(box.id)}
-                            />
-                        ) : (
-                            <Text
-                                key={box.id}
-                                x={box.x}
-                                y={box.y}
-                                text={box.text}
-                                fontSize={20}
-                                fill="#000"
-                                draggable
-                                onClick={() => handleTextClick(box.id)}
-                                onDblClick={() => handleTextClick(box.id)}
-                                onDragEnd={(e) =>
-                                    handleDragText(box.id, {
-                                        x: e.target.x(),
-                                        y: e.target.y(),
-                                    })
-                                }
-                            />
-                        )
-                    ))}
-
-                    {previewShape && (
-                        previewShape.type === 'rectangle' ? (
-                            <Rect
-                                x={previewShape.x}
-                                y={previewShape.y}
-                                width={previewShape.width}
-                                height={previewShape.height}
-                                stroke="gray"
-                                strokeWidth={2}
-                                dash={[10, 5]}
-                            />
-                        ) : previewShape.type === 'circle' ? (
-                            <Circle
-                                x={previewShape.x + previewShape.width / 2}
-                                y={previewShape.y + previewShape.height / 2}
-                                radius={Math.min(previewShape.width, previewShape.height) / 2}
-                                stroke="gray"
-                                strokeWidth={2}
-                                dash={[10, 5]}
-                            />
-                        ) : previewShape.type === 'line' ? (
-                            <Line
-                                points={[
-                                    previewShape.x,
-                                    previewShape.y,
-                                    previewShape.x + previewShape.width,
-                                    previewShape.y + previewShape.height
-                                ]}
-                                stroke="gray"
-                                strokeWidth={2}
-                                dash={[10, 5]}
-                                lineCap="round"
-                            />
-                        ) : null
-                    )}
-                </Layer>
-            </Stage>
-            {/* Hidden Text Area for Input */}
-            {currentTextBoxes.some(b => b.isEditing) && (
-                <textarea
-                    ref={textInputRef}
-                    style={{
-                        position: 'absolute',
-                        top: -1000,
-                        left: -1000,
-                        opacity: 0,
-                    }}
-                    value={
-                        currentTextBoxes.find(b => b.isEditing)?.text || ''
-                    }
-                    onChange={(e) => {
-                        const box = currentTextBoxes.find(b => b.isEditing);
-                        if (box) handleTextChange(box.id, e.target.value);
-                    }}
-                    onBlur={handleTextBlur}
-                />
-            )}
+              <FaUndo className="text-sm" />
+              <span className="hidden md:inline">Undo</span>
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={redo}
+              disabled={historyIndex >= history.length - 1}
+              className="gap-2 hover:bg-gray-100"
+            >
+              <FaRedo className="text-sm" />
+              <span className="hidden md:inline">Redo</span>
+            </Button>
+            
+            <div className="w-px h-6 bg-gray-300 mx-2"></div>
+            
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearPage}
+              className="gap-2 hover:bg-gray-100"
+            >
+              <FaTrash className="text-sm" />
+              <span className="hidden md:inline">Clear</span>
+            </Button>
+          </div>
         </div>
-    );
+        
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 bg-gray-100 rounded-lg px-3 py-1">
+            <span className="text-sm text-gray-600">Page {pageIndex + 1} of {lines.length}</span>
+            <div className="flex gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setPageIndex(prev => Math.max(0, prev - 1))}
+                disabled={pageIndex === 0}
+                className="h-6 w-6 p-0"
+              >
+                <FaArrowLeft className="text-xs" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setPageIndex(prev => Math.min(lines.length - 1, prev + 1))}
+                disabled={pageIndex === lines.length - 1}
+                className="h-6 w-6 p-0"
+              >
+                <FaArrowRight className="text-xs" />
+              </Button>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={addPage}
+              className="h-6 w-6 p-0"
+            >
+              <FaPlus className="text-xs" />
+            </Button>
+          </div>
+          
+          <Button variant="primary" size="sm" onClick={exportCanvas} className="gap-2">
+            <FaDownload className="text-sm" />
+            <span>Export</span>
+          </Button>
+          
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowToolbar(!showToolbar)}
+            className="hidden md:flex"
+          >
+            {showToolbar ? <FaCompress /> : <FaExpand />}
+          </Button>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Side Toolbar */}
+        {showToolbar && (
+          <div 
+            className={`w-64 bg-white border-r border-gray-200 shadow-lg overflow-y-auto transition-all duration-300 ${
+              showToolbar ? 'translate-x-0' : '-translate-x-full'
+            }`}
+          >
+            <div className="p-4 space-y-6">
+              {/* Tools Section */}
+              <div className="space-y-2">
+                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Tools</h3>
+                <div className="grid grid-cols-3 gap-2">
+                  {toolDefinitions.map((tool) => (
+                    <button
+                      key={tool.mode}
+                      onClick={() => setMode(tool.mode)}
+                      className={`flex flex-col items-center justify-center p-3 rounded-lg transition-all duration-200 ${
+                        mode === tool.mode
+                          ? 'bg-blue-50 border border-blue-200 shadow-sm'
+                          : 'bg-gray-50 hover:bg-gray-100 border border-transparent'
+                      }`}
+                      title={tool.label}
+                    >
+                      <div className={`text-lg mb-1 ${mode === tool.mode ? 'text-blue-600' : 'text-gray-600'}`}>
+                        {tool.icon}
+                      </div>
+                      <span className="text-xs text-gray-600">{tool.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Color Picker */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Colors</h3>
+                  <button
+                    onClick={() => setShowColorPicker(!showColorPicker)}
+                    className="p-1 hover:bg-gray-200 rounded transition-colors"
+                  >
+                    <FaPalette className="text-gray-600" />
+                  </button>
+                </div>
+                <div className="grid grid-cols-5 gap-2">
+                  {colors.map((color) => (
+                    <button
+                      key={color}
+                      onClick={() => setPenColor(color)}
+                      className={`w-8 h-8 rounded border-2 transition-transform hover:scale-110 ${
+                        penColor === color ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                      style={{ backgroundColor: color }}
+                      title={color}
+                    />
+                  ))}
+                </div>
+                {showColorPicker && (
+                  <div className="mt-2 pt-2 border-t border-gray-200">
+                    <input
+                      type="color"
+                      value={penColor}
+                      onChange={(e) => setPenColor(e.target.value)}
+                      className="w-full h-8 cursor-pointer rounded"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Tool Settings */}
+              {(mode === 'pen' || mode === 'highlighter' || mode === 'eraser') && (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Size: {penSize}px
+                    </label>
+                    <input
+                      type="range"
+                      min={1}
+                      max={30}
+                      value={penSize}
+                      onChange={(e) => setPenSize(Number(e.target.value))}
+                      className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-blue-600"
+                    />
+                  </div>
+                  
+                  {mode === 'highlighter' && (
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Opacity: {Math.round(highlighterOpacity * 100)}%
+                      </label>
+                      <input
+                        type="range"
+                        min={0.1}
+                        max={1}
+                        step={0.1}
+                        value={highlighterOpacity}
+                        onChange={(e) => setHighlighterOpacity(Number(e.target.value))}
+                        className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-blue-600"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Shape Selector */}
+              {mode === 'shape' && (
+                <div className="space-y-2">
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Shapes</h3>
+                  <div className="grid grid-cols-3 gap-2">
+                    {shapesList.map((shape) => (
+                      <button
+                        key={shape.type}
+                        onClick={() => setSelectedShape(shape.type)}
+                        className={`flex flex-col items-center justify-center p-3 rounded-lg transition-all duration-200 ${
+                          selectedShape === shape.type
+                            ? 'bg-blue-50 border border-blue-200 shadow-sm'
+                            : 'bg-gray-50 hover:bg-gray-100 border border-transparent'
+                        }`}
+                        title={shape.label}
+                      >
+                        <div className={`text-lg mb-1 ${
+                          selectedShape === shape.type ? 'text-blue-600' : 'text-gray-600'
+                        }`}>
+                          {shape.icon}
+                        </div>
+                        <span className="text-xs text-gray-600">{shape.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Text Formatting */}
+              {mode === 'text' && (
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Font</h3>
+                    <select
+                      value={selectedFont}
+                      onChange={(e) => setSelectedFont(e.target.value)}
+                      className="w-full p-2 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      {fonts.map((font: string) => (
+                        <option key={font} value={font}>
+                          {font}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Size: {selectedFontSize}px
+                    </label>
+                    <input
+                      type="range"
+                      min={8}
+                      max={72}
+                      value={selectedFontSize}
+                      onChange={(e) => setSelectedFontSize(Number(e.target.value))}
+                      className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-blue-600"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Format</h3>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setTextBold(!textBold)}
+                        className={`p-2 rounded transition-colors ${
+                          textBold ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 hover:bg-gray-200 text-gray-600'
+                        }`}
+                      >
+                        <FaBold />
+                      </button>
+                      <button
+                        onClick={() => setTextItalic(!textItalic)}
+                        className={`p-2 rounded transition-colors ${
+                          textItalic ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 hover:bg-gray-200 text-gray-600'
+                        }`}
+                      >
+                        <FaItalic />
+                      </button>
+                      <button
+                        onClick={() => setTextUnderline(!textUnderline)}
+                        className={`p-2 rounded transition-colors ${
+                          textUnderline ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 hover:bg-gray-200 text-gray-600'
+                        }`}
+                      >
+                        <FaUnderline />
+                      </button>
+                    </div>
+                    
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setTextAlign('left')}
+                        className={`p-2 rounded transition-colors ${
+                          textAlign === 'left' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 hover:bg-gray-200 text-gray-600'
+                        }`}
+                      >
+                        <FaAlignLeft />
+                      </button>
+                      <button
+                        onClick={() => setTextAlign('center')}
+                        className={`p-2 rounded transition-colors ${
+                          textAlign === 'center' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 hover:bg-gray-200 text-gray-600'
+                        }`}
+                      >
+                        <FaAlignCenter />
+                      </button>
+                      <button
+                        onClick={() => setTextAlign('right')}
+                        className={`p-2 rounded transition-colors ${
+                          textAlign === 'right' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 hover:bg-gray-200 text-gray-600'
+                        }`}
+                      >
+                        <FaAlignRight />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Canvas Settings */}
+              <div className="space-y-2">
+                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Canvas</h3>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm text-gray-600">Grid</label>
+                    <button
+                      onClick={() => setGridSettings(prev => ({
+                        ...prev,
+                        enabled: !prev.enabled
+                      }))}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        gridSettings.enabled ? 'bg-blue-600' : 'bg-gray-300'
+                      }`}
+                    >
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        gridSettings.enabled ? 'translate-x-6' : 'translate-x-1'
+                      }`} />
+                    </button>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-2">Background</label>
+                    <div className="flex gap-2">
+                      {['#ffffff', '#f8f9fa', '#e9ecef', '#f0f0f0', '#1a1a1a'].map((color) => (
+                        <button
+                          key={color}
+                          onClick={() => changeBackground(color)}
+                          className={`w-8 h-8 rounded border-2 transition-transform hover:scale-110 ${
+                            background === color ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-300'
+                          }`}
+                          style={{ backgroundColor: color }}
+                          title={color}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Main Canvas Area */}
+        <div className="flex-1 relative overflow-hidden">
+          {/* Floating Toolbar for quick access */}
+          <div className="absolute top-4 left-4 z-10 bg-white rounded-lg shadow-lg border border-gray-200 p-2">
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowToolbar(!showToolbar)}
+                className="h-8 w-8 p-0"
+                title={showToolbar ? "Hide toolbar" : "Show toolbar"}
+              >
+                {showToolbar ? <FaCompress className="text-sm" /> : <FaExpand className="text-sm" />}
+              </Button>
+              
+              <div className="w-px h-6 bg-gray-300 mx-1"></div>
+              
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={undo}
+                disabled={historyIndex <= 0}
+                className="h-8 w-8 p-0"
+                title="Undo"
+              >
+                <FaUndo className="text-sm" />
+              </Button>
+              
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={redo}
+                disabled={historyIndex >= history.length - 1}
+                className="h-8 w-8 p-0"
+                title="Redo"
+              >
+                <FaRedo className="text-sm" />
+              </Button>
+              
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearPage}
+                className="h-8 w-8 p-0"
+                title="Clear page"
+              >
+                <FaTrash className="text-sm" />
+              </Button>
+              
+              <div className="w-px h-6 bg-gray-300 mx-1"></div>
+              
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setScale(1);
+                  setStagePos({ x: 0, y: 0 });
+                }}
+                className="h-8 w-8 p-0 text-xs"
+                title="Reset zoom"
+              >
+                100%
+              </Button>
+            </div>
+          </div>
+
+          {/* Canvas */}
+          <Stage
+            ref={stageRef}
+            width={stageSize.width}
+            height={stageSize.height}
+            scaleX={scale}
+            scaleY={scale}
+            x={stagePos.x}
+            y={stagePos.y}
+            onWheel={handleWheel}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            style={{ 
+              cursor,
+              backgroundColor: background
+            }}
+            className="bg-white"
+          >
+            <Layer>
+              {/* Grid */}
+              {renderGrid()}
+
+              {/* Drawings */}
+              {currentLines.map((line, i) => (
+                <Line
+                  key={i}
+                  points={line.points}
+                  stroke={line.color}
+                  strokeWidth={line.size}
+                  opacity={line.opacity}
+                  tension={0.5}
+                  lineCap="round"
+                  lineJoin="round"
+                  globalCompositeOperation={line.tool === 'eraser' ? 'destination-out' : 'source-over'}
+                />
+              ))}
+
+              {/* Shapes */}
+              {currentShapes.map((shape) => {
+                const isSelected = selectedElement?.type === 'shape' && selectedElement?.id === shape.id;
+                
+                if (shape.type === 'rectangle') {
+                  return (
+                    <Rect
+                      key={shape.id}
+                      x={shape.x}
+                      y={shape.y}
+                      width={shape.width}
+                      height={shape.height}
+                      fill={shape.fill}
+                      stroke={shape.stroke}
+                      strokeWidth={shape.strokeWidth}
+                      rotation={shape.rotation}
+                      draggable={mode === 'select'}
+                      onClick={() => setSelectedElement({ type: 'shape', id: shape.id })}
+                      onDragEnd={(e) => {
+                        const updated = [...shapes];
+                        updated[pageIndex] = currentShapes.map(s =>
+                          s.id === shape.id ? {
+                            ...s,
+                            x: e.target.x(),
+                            y: e.target.y()
+                          } : s
+                        );
+                        setCanvasData(prev => ({ ...prev, shapes: updated }));
+                      }}
+                    />
+                  );
+                } else if (shape.type === 'circle') {
+                  return (
+                    <Circle
+                      key={shape.id}
+                      x={shape.x + shape.width / 2}
+                      y={shape.y + shape.height / 2}
+                      radius={Math.max(shape.width, shape.height) / 2}
+                      fill={shape.fill}
+                      stroke={shape.stroke}
+                      strokeWidth={shape.strokeWidth}
+                      rotation={shape.rotation}
+                      draggable={mode === 'select'}
+                      onClick={() => setSelectedElement({ type: 'shape', id: shape.id })}
+                      onDragEnd={(e) => {
+                        const updated = [...shapes];
+                        updated[pageIndex] = currentShapes.map(s =>
+                          s.id === shape.id ? {
+                            ...s,
+                            x: e.target.x() - shape.width / 2,
+                            y: e.target.y() - shape.height / 2
+                          } : s
+                        );
+                        setCanvasData(prev => ({ ...prev, shapes: updated }));
+                      }}
+                    />
+                  );
+                } else if (shape.type === 'arrow') {
+                  return (
+                    <Arrow
+                      key={shape.id}
+                      points={[
+                        shape.x,
+                        shape.y,
+                        shape.x + shape.width,
+                        shape.y + shape.height
+                      ]}
+                      stroke={shape.stroke}
+                      strokeWidth={shape.strokeWidth}
+                      fill={shape.stroke}
+                      pointerLength={10}
+                      pointerWidth={10}
+                      draggable={mode === 'select'}
+                      onClick={() => setSelectedElement({ type: 'shape', id: shape.id })}
+                      onDragEnd={(e) => {
+                        const updated = [...shapes];
+                        updated[pageIndex] = currentShapes.map(s =>
+                          s.id === shape.id ? {
+                            ...s,
+                            x: e.target.x(),
+                            y: e.target.y()
+                          } : s
+                        );
+                        setCanvasData(prev => ({ ...prev, shapes: updated }));
+                      }}
+                    />
+                  );
+                }
+                return null;
+              })}
+
+              {/* Text Boxes */}
+              {currentTextBoxes.map((text) => (
+                <Text
+                  key={text.id}
+                  x={text.x}
+                  y={text.y}
+                  text={text.text}
+                  fontSize={text.fontSize}
+                  fontFamily={text.fontFamily}
+                  fill={text.fill}
+                  align={text.align}
+                  fontStyle={`${text.bold ? 'bold' : ''} ${text.italic ? 'italic' : ''}`}
+                  textDecoration={text.underline ? 'underline' : ''}
+                  width={text.width}
+                  draggable={mode === 'select' && !text.isEditing}
+                  onClick={() => {
+                    if (mode === 'select') {
+                      setSelectedElement({ type: 'text', id: text.id });
+                    }
+                  }}
+                  onDblClick={() => {
+                    const updated = [...textBoxes];
+                    updated[pageIndex] = currentTextBoxes.map(t =>
+                      t.id === text.id ? { ...t, isEditing: true } : t
+                    );
+                    setCanvasData(prev => ({ ...prev, textBoxes: updated }));
+                  }}
+                  onDragEnd={(e) => {
+                    const updated = [...textBoxes];
+                    updated[pageIndex] = currentTextBoxes.map(t =>
+                      t.id === text.id ? {
+                        ...t,
+                        x: e.target.x(),
+                        y: e.target.y()
+                      } : t
+                    );
+                    setCanvasData(prev => ({ ...prev, textBoxes: updated }));
+                  }}
+                />
+              ))}
+
+              {/* Preview Shape */}
+              {previewShape && previewShape.type === 'rectangle' && (
+                <Rect
+                  x={previewShape.x}
+                  y={previewShape.y}
+                  width={previewShape.width}
+                  height={previewShape.height}
+                  stroke={previewShape.stroke}
+                  strokeWidth={previewShape.strokeWidth}
+                  dash={[5, 5]}
+                />
+              )}
+            </Layer>
+          </Stage>
+
+          {/* Zoom Controls */}
+          <div className="absolute bottom-4 right-4 z-10">
+            <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-2">
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setScale(prev => Math.max(0.1, prev / 1.2))}
+                  className="h-8 w-8 p-0"
+                  title="Zoom out"
+                >
+                  <FaMinus />
+                </Button>
+                
+                <div className="text-center min-w-[70px]">
+                  <div className="text-sm font-medium text-gray-700">
+                    {Math.round(scale * 100)}%
+                  </div>
+                  <div className="text-xs text-gray-500">Zoom</div>
+                </div>
+                
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setScale(prev => Math.min(5, prev * 1.2))}
+                  className="h-8 w-8 p-0"
+                  title="Zoom in"
+                >
+                  <FaPlus />
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
