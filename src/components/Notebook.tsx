@@ -18,20 +18,15 @@ import {
   FaListOl,
   FaLink,
   FaImage,
-  FaTable,
   FaUndo,
   FaRedo,
   FaDownload,
-  FaFont,
   FaHighlighter,
   FaStrikethrough,
-  FaPalette,
   FaExpand,
   FaCompress,
   FaCopy,
-  FaTrash,
-  FaSave,
-  FaEraser
+  FaTrash
 } from 'react-icons/fa';
 
 interface TextFormat {
@@ -121,18 +116,20 @@ export default function Notebook({ noteId }: { noteId: string }) {
     };
   }, []);
 
-  // Initialize history
-  useEffect(() => {
-    if (history.length === 0) {
-      pushHistory();
-    }
-  }, []);
-
+  // History helper
   const pushHistory = useCallback(() => {
     const newHistory = [...history.slice(0, historyIndex + 1), JSON.parse(JSON.stringify(pages))];
     setHistory(newHistory);
     setHistoryIndex(newHistory.length - 1);
   }, [history, historyIndex, pages]);
+
+  // Initialize history
+  useEffect(() => {
+    if (history.length === 0) {
+      pushHistory();
+    }
+    // depend on history.length and pushHistory to satisfy exhaustive-deps
+  }, [history.length, pushHistory]);
 
   const undo = () => {
     if (historyIndex > 0) {
@@ -322,7 +319,7 @@ export default function Notebook({ noteId }: { noteId: string }) {
       fontStyle: format.italic ? 'italic' : 'normal',
       textDecoration: format.underline ? 'underline' : 'none',
       lineHeight: '1.6',
-      textAlign: format.align as any,
+      textAlign: format.align as 'left' | 'center' | 'right',
       resize: 'none',
       overflow: 'hidden',
       minHeight: '40px',
