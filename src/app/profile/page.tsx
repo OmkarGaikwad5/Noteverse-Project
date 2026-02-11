@@ -50,7 +50,7 @@ export default function ProfilePage() {
     const handleLogout = async () => {
         try {
             await fetch('/api/auth/logout', { method: 'POST' });
-            router.push('/login');
+            router.push('/home');
         } catch (error) {
             console.error('Logout failed:', error);
         }
