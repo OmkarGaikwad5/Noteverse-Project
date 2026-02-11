@@ -39,7 +39,7 @@ interface Notebook {
 }
 
 export default function Navbar() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const router = useRouter();
   const pathname = usePathname();
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -58,15 +58,16 @@ export default function Navbar() {
     await signOut({ callbackUrl: "/login" });
   };
 
-  // Fetch notebooks for search (similar to NotebookGrid)
+  // Fetch notebooks for search
   const fetchNotebooksForSearch = async (): Promise<Notebook[]> => {
+    // Don't fetch if no session
+    if (!session?.user) return [];
+    
     try {
-      // Get user data
       const res = await fetch('/api/auth/me');
       if (!res.ok) return [];
       const userData = await res.json();
 
-      // Fetch notebooks
       const resNotes = await fetch(`/api/v2/notebooks?userId=${userData.user.id}`);
       const data = await resNotes.json();
       return data.notebooks || [];
@@ -78,7 +79,7 @@ export default function Navbar() {
 
   // Search functionality
   const performSearch = async (query: string) => {
-    if (!query.trim()) {
+    if (!query.trim() || !session?.user) {
       setSearchResults([]);
       setShowSearchResults(false);
       return;
@@ -90,16 +91,13 @@ export default function Navbar() {
       const notebooks = await fetchNotebooksForSearch();
       const searchQuery = query.toLowerCase().trim();
       
-      // Filter notebooks by search query
       const results = notebooks.filter((notebook: Notebook) => {
         const titleMatch = notebook.title?.toLowerCase().includes(searchQuery);
         const descMatch = notebook.description?.toLowerCase().includes(searchQuery);
         const typeMatch = notebook.type?.toLowerCase().includes(searchQuery);
-        
         return titleMatch || descMatch || typeMatch;
       });
       
-      // Format results
       const formattedResults = results.map((notebook: Notebook): SearchResult => ({
         _id: notebook._id,
         title: notebook.title,
@@ -109,20 +107,17 @@ export default function Navbar() {
         coverColor: notebook.coverColor
       }));
       
-      // Sort by relevance and recency
       const sortedResults = formattedResults.sort((a: SearchResult, b: SearchResult) => {
-        // First, prioritize title matches
         const aTitleMatch = a.title.toLowerCase().includes(searchQuery);
         const bTitleMatch = b.title.toLowerCase().includes(searchQuery);
         
         if (aTitleMatch && !bTitleMatch) return -1;
         if (!aTitleMatch && bTitleMatch) return 1;
         
-        // Then by recency
         return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
       });
       
-      setSearchResults(sortedResults.slice(0, 8)); // Limit to 8 results
+      setSearchResults(sortedResults.slice(0, 8));
       setShowSearchResults(true);
     } catch (error) {
       console.error("Search error:", error);
@@ -134,7 +129,7 @@ export default function Navbar() {
 
   // Debounced search for desktop
   useEffect(() => {
-    if (!searchQuery.trim()) {
+    if (!searchQuery.trim() || !session?.user) {
       setSearchResults([]);
       setShowSearchResults(false);
       return;
@@ -147,7 +142,7 @@ export default function Navbar() {
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [searchQuery]);
+  }, [searchQuery, session]);
 
   // Close search results when clicking outside
   useEffect(() => {
@@ -167,7 +162,6 @@ export default function Navbar() {
 
   // Handle search result click
   const handleResultClick = (result: SearchResult) => {
-    // Navigate to notebook page (same as NotebookGrid)
     router.push(`/notebook/${result._id}`);
     setSearchQuery("");
     setShowSearchResults(false);
@@ -200,7 +194,6 @@ export default function Navbar() {
       if (searchResults.length > 0) {
         handleResultClick(searchResults[0]);
       } else {
-        // Navigate to library with search query
         router.push(`/library?search=${encodeURIComponent(searchQuery)}`);
         setSearchQuery("");
         setShowSearchResults(false);
@@ -216,7 +209,6 @@ export default function Navbar() {
       if (searchResults.length > 0) {
         handleResultClick(searchResults[0]);
       } else {
-        // Navigate to library with search query
         router.push(`/library?search=${encodeURIComponent(searchQuery)}`);
         setSearchQuery("");
         setShowSearchResults(false);
@@ -227,6 +219,11 @@ export default function Navbar() {
 
   // Create new notebook
   const handleCreateNotebook = async (type: 'canvas' | 'note') => {
+    if (!session?.user) {
+      router.push('/login');
+      return;
+    }
+    
     setShowCreateMenu(false);
     
     try {
@@ -255,6 +252,23 @@ export default function Navbar() {
     }
   };
 
+  // Show loading state while session is loading
+  if (status === "loading") {
+    return (
+      <nav className="sticky top-0 z-50 w-full bg-white/90 backdrop-blur-xl border-b border-gray-200 shadow-sm">
+        <div className="px-6 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-8">
+              <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl flex items-center justify-center">
+                <span className="text-white font-bold text-lg">NV</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </nav>
+    );
+  }
+
   // Hide navbar on auth pages
   if (pathname === "/login" || pathname === "/signup") {
     return null;
@@ -268,7 +282,6 @@ export default function Navbar() {
 
   return (
     <>
-      {/* Sticky Navbar */}
       <nav className="sticky top-0 z-50 w-full bg-white/90 backdrop-blur-xl border-b border-gray-200 shadow-sm">
         <div className="px-6 py-3">
           <div className="flex items-center justify-between">
@@ -276,7 +289,6 @@ export default function Navbar() {
             {/* Left Section - Logo & Navigation */}
             {!showMobileSearch && (
               <div className="flex items-center gap-8">
-                {/* Logo */}
                 <Link href="/home" className="flex items-center gap-2 group">
                   <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
                     <span className="text-white font-bold text-lg">NV</span>
@@ -289,7 +301,6 @@ export default function Navbar() {
                   </div>
                 </Link>
 
-                {/* Navigation Items */}
                 <div className="hidden md:flex items-center gap-1">
                   {navItems.map((item) => (
                     <Link
@@ -309,8 +320,8 @@ export default function Navbar() {
               </div>
             )}
 
-            {/* Center Section - Search Bar (Desktop) */}
-            {!showMobileSearch && (
+            {/* Center Section - Search Bar (Desktop) - Only show when logged in */}
+            {!showMobileSearch && session?.user && (
               <div className="flex-1 max-w-xl mx-6 hidden lg:block" ref={searchRef}>
                 <form onSubmit={handleSearchSubmit} className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -413,12 +424,6 @@ export default function Navbar() {
                           </button>
                         </div>
                       ) : null}
-                      
-                      {searchResults.length > 0 && (
-                        <div className="px-4 py-2 text-xs text-gray-500 border-t border-gray-100">
-                          Press <kbd className="px-1.5 py-0.5 bg-gray-100 rounded text-xs font-mono">Enter</kbd> to open first result
-                        </div>
-                      )}
                     </div>
                   )}
                 </form>
@@ -426,7 +431,7 @@ export default function Navbar() {
             )}
 
             {/* Mobile Search Bar (Full Screen) */}
-            {showMobileSearch && (
+            {showMobileSearch && session?.user && (
               <div className="fixed inset-0 z-50 bg-white p-4" ref={mobileSearchRef}>
                 <div className="flex items-center gap-3 mb-6">
                   <button
@@ -551,83 +556,94 @@ export default function Navbar() {
               </div>
             )}
 
-            {/* Right Section - Actions & User Menu (Hidden when mobile search is active) */}
+            {/* Right Section - Actions & User Menu */}
             {!showMobileSearch && (
               <div className="flex items-center gap-3">
-                {/* Mobile Search Button */}
-                <button 
-                  className="lg:hidden p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
-                  onClick={() => {
-                    setShowMobileSearch(true);
-                    setTimeout(() => {
-                      mobileInputRef.current?.focus();
-                    }, 100);
-                  }}
-                >
-                  <FaSearch className="w-5 h-5" />
-                </button>
-
-                {/* Create Button with Dropdown */}
-                <div className="relative">
-                  <Button
-                    onClick={() => setShowCreateMenu(!showCreateMenu)}
-                    className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl"
+                {/* Mobile Search Button - Only show when logged in */}
+                {session?.user && (
+                  <button 
+                    className="lg:hidden p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
+                    onClick={() => {
+                      setShowMobileSearch(true);
+                      setTimeout(() => {
+                        mobileInputRef.current?.focus();
+                      }, 100);
+                    }}
                   >
-                    <FaPlus className="w-4 h-4" />
-                    <span className="hidden sm:inline">Create</span>
-                    <FaChevronDown className="w-3 h-3" />
-                  </Button>
-                  
-                  {showCreateMenu && (
-                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-2xl border border-gray-200 py-2 z-50 animate-in fade-in slide-in-from-top-2">
-                      <button
-                        onClick={() => handleCreateNotebook('canvas')}
-                        className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors w-full text-left"
-                      >
-                        <FaPalette className="text-blue-500" />
-                        <div>
-                          <div className="font-medium">Canvas Notebook</div>
-                          <div className="text-xs text-gray-500">Whiteboard & drawings</div>
-                        </div>
-                      </button>
-                      <button
-                        onClick={() => handleCreateNotebook('note')}
-                        className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-emerald-50 hover:text-emerald-600 transition-colors border-t border-gray-100 w-full text-left"
-                      >
-                        <FaBook className="text-emerald-500" />
-                        <div>
-                          <div className="font-medium">Text Notebook</div>
-                          <div className="text-xs text-gray-500">Documents & writings</div>
-                        </div>
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                {/* User Menu */}
-                <div className="relative">
-                  <button
-                    onClick={() => setShowUserMenu(!showUserMenu)}
-                    className="flex items-center gap-2 p-1 rounded-lg hover:bg-gray-100 transition-colors"
-                  >
-                    <div className="w-9 h-9 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white font-semibold">
-                      {session?.user?.image ? (
-                        <img
-                          src={session.user.image}
-                          alt="Profile"
-                          className="w-full h-full rounded-full object-cover"
-                        />
-                      ) : (
-                        session?.user?.name?.charAt(0) || <FaUserCircle className="w-6 h-6" />
-                      )}
-                    </div>
-                    <FaChevronDown className={`w-3 h-3 text-gray-500 transition-transform ${showUserMenu ? 'rotate-180' : ''}`} />
+                    <FaSearch className="w-5 h-5" />
                   </button>
+                )}
+
+                {/* Create Button with Dropdown - Only show when logged in */}
+                {session?.user && (
+                  <div className="relative">
+                    <Button
+                      onClick={() => setShowCreateMenu(!showCreateMenu)}
+                      className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl"
+                    >
+                      <FaPlus className="w-4 h-4" />
+                      <span className="hidden sm:inline">Create</span>
+                      <FaChevronDown className="w-3 h-3" />
+                    </Button>
+                    
+                    {showCreateMenu && (
+                      <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-2xl border border-gray-200 py-2 z-50 animate-in fade-in slide-in-from-top-2">
+                        <button
+                          onClick={() => handleCreateNotebook('canvas')}
+                          className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors w-full text-left"
+                        >
+                          <FaPalette className="text-blue-500" />
+                          <div>
+                            <div className="font-medium">Canvas Notebook</div>
+                            <div className="text-xs text-gray-500">Whiteboard & drawings</div>
+                          </div>
+                        </button>
+                        <button
+                          onClick={() => handleCreateNotebook('note')}
+                          className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-emerald-50 hover:text-emerald-600 transition-colors border-t border-gray-100 w-full text-left"
+                        >
+                          <FaBook className="text-emerald-500" />
+                          <div>
+                            <div className="font-medium">Text Notebook</div>
+                            <div className="text-xs text-gray-500">Documents & writings</div>
+                          </div>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* User Menu - Show different content based on auth status */}
+                <div className="relative">
+                  {session?.user ? (
+                    <button
+                      onClick={() => setShowUserMenu(!showUserMenu)}
+                      className="flex items-center gap-2 p-1 rounded-lg hover:bg-gray-100 transition-colors"
+                    >
+                      <div className="w-9 h-9 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white font-semibold">
+                        {session?.user?.image ? (
+                          <img
+                            src={session.user.image}
+                            alt="Profile"
+                            className="w-full h-full rounded-full object-cover"
+                          />
+                        ) : (
+                          session?.user?.name?.charAt(0) || <FaUserCircle className="w-6 h-6" />
+                        )}
+                      </div>
+                      <FaChevronDown className={`w-3 h-3 text-gray-500 transition-transform ${showUserMenu ? 'rotate-180' : ''}`} />
+                    </button>
+                  ) : (
+                    <Link href="/login">
+                      <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white">
+                        Sign In
+                      </Button>
+                    </Link>
+                  )}
 
                   {/* User Dropdown Menu */}
-                  {showUserMenu && (
+                  {showUserMenu && session?.user && (
                     <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-2xl border border-gray-200 py-2 z-50 animate-in fade-in slide-in-from-top-2">
-                      {/* User Info */}
                       <div className="px-4 py-3 border-b border-gray-100">
                         <div className="font-semibold text-gray-900">
                           {session?.user?.name || "User"}
@@ -637,7 +653,6 @@ export default function Navbar() {
                         </div>
                       </div>
 
-                      {/* Menu Items */}
                       <Link
                         href="/profile"
                         onClick={() => setShowUserMenu(false)}
@@ -656,10 +671,8 @@ export default function Navbar() {
                         <span>My Library</span>
                       </Link>
                       
-                      {/* Divider */}
                       <div className="border-t border-gray-100 my-2"></div>
 
-                      {/* Logout */}
                       <button
                         onClick={handleLogout}
                         className="flex items-center gap-3 w-full px-4 py-3 text-left text-red-600 hover:bg-red-50 transition-colors rounded-b-xl"
@@ -674,8 +687,8 @@ export default function Navbar() {
             )}
           </div>
 
-          {/* Mobile Navigation (Hidden when mobile search is active) */}
-          {!showMobileSearch && (
+          {/* Mobile Navigation - Only show when logged in */}
+          {!showMobileSearch && session?.user && (
             <div className="md:hidden mt-4 pt-3 border-t border-gray-200">
               <div className="flex items-center justify-around">
                 {navItems.map((item) => (
@@ -722,7 +735,6 @@ export default function Navbar() {
         )}
       </nav>
 
-      {/* Styles for animations */}
       <style jsx global>{`
         @keyframes fade-in {
           from { opacity: 0; }
