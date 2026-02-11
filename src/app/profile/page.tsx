@@ -51,47 +51,42 @@ interface UserStats {
 }
 
 export default function ProfilePage() {
-  const router = useRouter();
-  const { data: session } = useSession();
+    const router = useRouter();
+    const [user, setUser] = useState<UserProfile | null>(null);
+    const [stats, setStats] = useState<UserStats>({ notes: 0, canvases: 0 });
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
 
-  const [user, setUser] = useState<UserProfile | null>(null);
-  const [stats, setStats] = useState<UserStats>({
-    notes: 0,
-    canvases: 0,
-    totalNotes: 0,
-    activeProjects: 0,
-    last7Days: 0,
-  });
-  const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("overview");
-  const [error, setError] = useState("");
+    useEffect(() => {
+        const fetchProfile = async () => {
+            try {
+                const res = await fetch('/api/profile');
+                if (!res.ok) {
+                    throw new Error('Failed to fetch profile');
+                }
+                const data = await res.json();
+                setUser(data.user);
+                setStats(data.stats);
+            } catch (err) {
+                console.error(err);
+                setError('Could not load profile data');
+                // Optional: Redirect to login if unauthorized
+                // router.push('/login'); 
+            } finally {
+                setLoading(false);
+            }
+        };
 
-  useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const res = await fetch("/api/profile");
-        if (!res.ok) throw new Error("Failed to fetch profile");
+        fetchProfile();
+    }, [router]);
 
-        const data = await res.json();
-        setUser({
-          ...data.user,
-          plan: "Pro",
-          storageUsed: 2.7, // GB
-          storageTotal: 10, // GB
-          lastActive: new Date().toISOString(),
-        });
-        setStats({
-          ...data.stats,
-          totalNotes: data.stats.notes + data.stats.canvases,
-          activeProjects: 3,
-          last7Days: 12,
-        });
-      } catch (err) {
-        console.error(err);
-        setError("Could not load profile data");
-      } finally {
-        setLoading(false);
-      }
+    const handleLogout = async () => {
+        try {
+            await fetch('/api/auth/logout', { method: 'POST' });
+            router.push('/home');
+        } catch (error) {
+            console.error('Logout failed:', error);
+        }
     };
 
     fetchProfile();
