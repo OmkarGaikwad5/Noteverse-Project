@@ -1,47 +1,48 @@
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { getToken } from "next-auth/jwt";
 
-export function middleware(request: NextRequest) {
-    const path = request.nextUrl.pathname;
+export async function middleware(request: NextRequest) {
+  const path = request.nextUrl.pathname;
 
-    // Define public paths that don't require authentication
-    const isPublicPath = path === '/login' || path === '/signup' || path === '/';
-    // Define API paths (mostly public, but some might be protected individually)
-    // We generally let API routes handle their own auth or pass through, 
-    // but we definitely don't want to redirect API calls to a login HTML page.
-    const isApiPath = path.startsWith('/api/');
+  const isPublicPath =
+    path === "/login" || path === "/signup" || path === "/";
 
-    const token = request.cookies.get('token')?.value || '';
+  const isApiPath = path.startsWith("/api/");
 
-    // 1. If trying to access a protected route without a token, redirect to login
-    // We exclude API routes from this redirect to avoid 307 redirects on fetch calls
-    if (!isPublicPath && !isApiPath && !token) {
-        return NextResponse.redirect(new URL('/login', request.url));
-    }
+  // OLD JWT token
+  const jwtToken = request.cookies.get("token")?.value;
 
-    // 2. If trying to access login/signup while already logged in, redirect to library
-    if ((path === '/login' || path === '/signup') && token) {
-        return NextResponse.redirect(new URL('/library', request.url));
-    }
+  // NextAuth token
+  const nextAuthToken = await getToken({
+    req: request,
+    secret: process.env.NEXTAUTH_SECRET,
+  });
 
-    return NextResponse.next();
+  const isLoggedIn = !!jwtToken || !!nextAuthToken;
+
+  // 1. Block protected routes if not logged in
+  if (!isPublicPath && !isApiPath && !isLoggedIn) {
+    return NextResponse.redirect(new URL("/login", request.url));
+  }
+
+  // 2. If already logged in, prevent visiting login/signup
+  if ((path === "/login" || path === "/signup") && isLoggedIn) {
+    return NextResponse.redirect(new URL("/library", request.url));
+  }
+
+  return NextResponse.next();
 }
 
-// Ensure middleware runs on relevant paths
 export const config = {
-    matcher: [
-        '/',
-        '/login',
-        '/signup',
-        '/home',
-        '/library',
-        '/profile',
-        '/notebook/:path*',
-        '/note/:path*',
-        // Match all paths except those starting with:
-        // - _next/static (static files)
-        // - _next/image (image optimization files)
-        // - favicon.ico (favicon file)
-        // '/((?!_next/static|_next/image|favicon.ico).*)',
-    ],
+  matcher: [
+    "/",
+    "/login",
+    "/signup",
+    "/home",
+    "/library",
+    "/profile",
+    "/notebook/:path*",
+    "/note/:path*",
+  ],
 };

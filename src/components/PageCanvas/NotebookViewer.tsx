@@ -113,12 +113,26 @@ function NotebookViewerContent({ notebookId, userId }: NotebookViewerProps) {
         </div>
     );
 }
-export default function NotebookViewer(props: NotebookViewerProps) {
-    if (!props.userId) return <div className="p-8">Please log in to view this notebook.</div>;
+
+import { useSession } from "next-auth/react";
+
+export default function NotebookViewer(props: Omit<NotebookViewerProps, "userId">) {
+    const { data: session, status } = useSession();
+
+    if (status === "loading") {
+        return <div className="p-8">Loading...</div>;
+    }
+
+    if (!session?.user) {
+        return <div className="p-8">Please log in to view this notebook.</div>;
+    }
+
+    const userId = (session.user as any).id || session.user.email;
 
     return (
-        <NotebookSyncProvider userId={props.userId}>
-            <NotebookViewerContent {...props} />
+        <NotebookSyncProvider userId={userId}>
+            <NotebookViewerContent notebookId={props.notebookId} userId={userId} />
         </NotebookSyncProvider>
     );
 }
+

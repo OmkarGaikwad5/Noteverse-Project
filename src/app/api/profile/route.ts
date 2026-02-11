@@ -1,54 +1,72 @@
-import { NextResponse } from 'next/server';
-import { headers } from 'next/headers';
-import jwt from 'jsonwebtoken';
-import dbConnect from '@/lib/db';
-import User from '@/models/User';
-import Notebook from '@/models/Notebook';
+import { NextResponse } from "next/server";
+import jwt from "jsonwebtoken";
+import dbConnect from "@/lib/db";
+import User from "@/models/User";
+import Notebook from "@/models/Notebook";
+import { getServerSession } from "next-auth";
+import { authOptions } from "../auth/[...nextauth]/route";
+import { headers } from "next/headers";
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
-export async function GET(req: Request) {
-    try {
-        await dbConnect();
+const JWT_SECRET = process.env.JWT_SECRET!;
 
-        // precise cookie extraction
-        const cookieHeader = req.headers.get('cookie');
-        const token = cookieHeader?.split(';').find(c => c.trim().startsWith('token='))?.split('=')[1];
+export async function GET() {
+  try {
+    await dbConnect();
 
-        if (!token) {
-            return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
-        }
+    let user = null;
 
-        let decoded: any;
-        try {
-            decoded = jwt.verify(token, JWT_SECRET);
-        } catch (err) {
-            return NextResponse.json({ message: 'Invalid token' }, { status: 401 });
-        }
+    // 1. Try NextAuth session (Google/GitHub)
+    const session = await getServerSession(authOptions);
 
-        const user = await User.findById(decoded.userId).select('name email createdAt');
-        if (!user) {
-            return NextResponse.json({ message: 'User not found' }, { status: 404 });
-        }
-
-        // Get stats
-        const notesCount = await Notebook.countDocuments({ userId: user._id, type: { $ne: 'canvas' } });
-        const canvasCount = await Notebook.countDocuments({ userId: user._id, type: 'canvas' });
-
-        return NextResponse.json({
-            user: {
-                name: user.name || 'Guest User',
-                email: user.email,
-                joinedAt: user.createdAt
-            },
-            stats: {
-                notes: notesCount,
-                canvases: canvasCount
-            }
-        });
-
-    } catch (error) {
-        console.error('Profile API Error:', error);
-        return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
+    if (session?.user?.email) {
+      user = await User.findOne({ email: session.user.email });
     }
+
+    // 2. Fallback → Old JWT
+    if (!user) {
+      const cookieHeader = headers().get("cookie");
+      const token = cookieHeader
+        ?.split(";")
+        .find((c) => c.trim().startsWith("token="))
+        ?.split("=")[1];
+
+      if (token) {
+        try {
+          const decoded: any = jwt.verify(token, JWT_SECRET);
+          user = await User.findById(decoded.userId);
+        } catch (e) {}
+      }
+    }
+
+    if (!user) {
+      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    }
+
+    // Stats
+    const notesCount = await Notebook.countDocuments({
+      userId: user._id,
+      type: { $ne: "canvas" },
+    });
+
+    const canvasCount = await Notebook.countDocuments({
+      userId: user._id,
+      type: "canvas",
+    });
+
+    return NextResponse.json({
+      user: {
+        name: user.name || "Guest User",
+        email: user.email,
+        joinedAt: user.createdAt,
+      },
+      stats: {
+        notes: notesCount,
+        canvases: canvasCount,
+      },
+    });
+  } catch (error) {
+    console.error("Profile API Error:", error);
+    return NextResponse.json({ message: "Internal Server Error" }, { status: 500 });
+  }
 }

@@ -1,4 +1,3 @@
-
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
@@ -18,14 +17,15 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "NoteVerse",
-  description: "Organize, create, and manage your notes effortlessly with NoteVerse — your intelligent note-taking companion.",
+  description:
+    "Organize, create, and manage your notes effortlessly with NoteVerse — your intelligent note-taking companion.",
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
     <html lang="en">
       <body
