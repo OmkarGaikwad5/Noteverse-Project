@@ -7,7 +7,6 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]/route";
 import { headers } from "next/headers";
 
-
 const JWT_SECRET = process.env.JWT_SECRET!;
 
 export async function GET() {
@@ -25,7 +24,9 @@ export async function GET() {
 
     // 2. Fallback → Old JWT
     if (!user) {
-      const cookieHeader = headers().get("cookie");
+      const headerList = await headers(); // ✅ FIXED (await)
+      const cookieHeader = headerList.get("cookie");
+
       const token = cookieHeader
         ?.split(";")
         .find((c) => c.trim().startsWith("token="))
@@ -33,9 +34,14 @@ export async function GET() {
 
       if (token) {
         try {
-          const decoded: any = jwt.verify(token, JWT_SECRET);
-          user = await User.findById(decoded.userId);
-        } catch (e) {}
+          const decoded = jwt.verify(token, JWT_SECRET) as { userId?: string } | string;
+          const decodedUserId = typeof decoded === 'object' && decoded && 'userId' in decoded ? decoded.userId : undefined;
+          if (decodedUserId) {
+            user = await User.findById(decodedUserId);
+          }
+        } catch (e) {
+          console.error("JWT verify error:", e);
+        }
       }
     }
 
@@ -67,6 +73,9 @@ export async function GET() {
     });
   } catch (error) {
     console.error("Profile API Error:", error);
-    return NextResponse.json({ message: "Internal Server Error" }, { status: 500 });
+    return NextResponse.json(
+      { message: "Internal Server Error" },
+      { status: 500 }
+    );
   }
 }

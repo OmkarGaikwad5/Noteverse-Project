@@ -2,13 +2,8 @@ import React from "react";
 import clsx from "clsx";
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-<<<<<<< HEAD
   variant?: "primary" | "secondary" | "ghost" | "outline" | "destructive";
   size?: "default" | "sm" | "lg" | "icon";
-=======
-  variant?: 'primary' | 'secondary' | 'ghost' | 'outline' | 'destructive';
-  size?: 'default' | 'sm' | 'lg' | 'icon';
->>>>>>> 0b5108468edf3bc56c020e463b50e318f73f8c2e
   children: React.ReactNode;
   className?: string;
   active?: boolean;
@@ -38,16 +33,15 @@ function Button({
     icon: "h-9 w-9",
   };
 
-  const variantClasses: Record<string, VariantState> = {
+  const variantClasses: Record<
+    NonNullable<ButtonProps["variant"]>,
+    VariantState
+  > = {
     primary: {
       active:
         "bg-primary text-primary-foreground hover:bg-primary/90 active:bg-primary/95",
       inactive:
         "bg-muted text-foreground hover:bg-muted-foreground/10 active:bg-muted-foreground/20",
-    },
-    destructive: {
-      active: 'bg-destructive text-destructive-foreground hover:bg-destructive/90 active:bg-destructive/95 focus-visible:ring-destructive',
-      inactive: 'bg-destructive text-destructive-foreground hover:bg-destructive/90 active:bg-destructive/95 focus-visible:ring-destructive',
     },
     secondary: {
       active:
@@ -56,30 +50,23 @@ function Button({
         "bg-muted text-foreground border border-border hover:bg-muted-foreground/10",
     },
     ghost: {
-      active:
-        "bg-transparent text-foreground hover:bg-muted",
-      inactive:
-        "bg-transparent text-muted-foreground hover:bg-muted",
+      active: "bg-transparent text-foreground hover:bg-muted",
+      inactive: "bg-transparent text-muted-foreground hover:bg-muted",
     },
     outline: {
-      active:
-        "border border-input bg-background hover:bg-accent",
-      inactive:
-        "border border-input bg-background hover:bg-accent",
+      active: "border border-input bg-background hover:bg-accent",
+      inactive: "border border-input bg-background hover:bg-accent",
     },
     destructive: {
-      active:
-        "bg-red-500 text-white hover:bg-red-600",
-      inactive:
-        "bg-red-500 text-white hover:bg-red-600",
+      active: "bg-red-500 text-white hover:bg-red-600",
+      inactive: "bg-red-500 text-white hover:bg-red-600",
     },
   };
 
   const disabledClasses =
     "bg-muted text-muted-foreground opacity-50 cursor-not-allowed";
 
-  const currentVariant =
-    variantClasses[variant] || variantClasses.primary;
+  const currentVariant = variantClasses[variant];
 
   return (
     <button

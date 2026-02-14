@@ -7,8 +7,8 @@ import jwt from 'jsonwebtoken';
 import dbConnect from '@/lib/db';
 import Notebook from '@/models/Notebook';
 
-export default async function Page({ params }: { params: any }) {
-    const { notebookId } = await params;
+export default async function Page({ params }: { params: { notebookId: string } }) {
+    const { notebookId } = params;
 
     // Get User ID from Token
     const cookieStore = await cookies();
@@ -17,8 +17,9 @@ export default async function Page({ params }: { params: any }) {
 
     if (token) {
         try {
-            const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret') as any;
-            userId = decoded.userId;
+            const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret') as { userId?: string } | string;
+            const decodedUserId = typeof decoded === 'object' && decoded && 'userId' in decoded ? decoded.userId : undefined;
+            if (decodedUserId) userId = decodedUserId;
         } catch (e) {
             console.error("Token verification failed", e);
         }
@@ -35,6 +36,6 @@ export default async function Page({ params }: { params: any }) {
         return <NoteViewer noteId={notebookId} />;
     }
 
-    // Default to 'canvas'
-    return <NotebookViewer notebookId={notebookId} userId={userId} />;
+    // Default to 'canvas' — NotebookViewer derives user from session on client
+    return <NotebookViewer notebookId={notebookId} />;
 }

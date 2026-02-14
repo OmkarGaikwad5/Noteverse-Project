@@ -24,8 +24,6 @@ import {
   FaRegEdit,
   FaUserCircle,
   FaHistory,
-  FaDesktop,
-  FaMobileAlt,
   FaDatabase,
 } from "react-icons/fa";
 import { FiTrendingUp, FiSettings, FiUserCheck } from "react-icons/fi";
@@ -51,46 +49,44 @@ interface UserStats {
 }
 
 export default function ProfilePage() {
-    const router = useRouter();
-    const [user, setUser] = useState<UserProfile | null>(null);
-    const [stats, setStats] = useState<UserStats>({ notes: 0, canvases: 0 });
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
+  const router = useRouter();
+  const { data: session, status } = useSession();
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [stats, setStats] = useState<UserStats>({ 
+    notes: 0, 
+    canvases: 0,
+    totalNotes: 0,
+    activeProjects: 0,
+    last7Days: 0 
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [activeTab, setActiveTab] = useState("overview");
 
-    useEffect(() => {
-        const fetchProfile = async () => {
-            try {
-                const res = await fetch('/api/profile');
-                if (!res.ok) {
-                    throw new Error('Failed to fetch profile');
-                }
-                const data = await res.json();
-                setUser(data.user);
-                setStats(data.stats);
-            } catch (err) {
-                console.error(err);
-                setError('Could not load profile data');
-                // Optional: Redirect to login if unauthorized
-                // router.push('/login'); 
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchProfile();
-    }, [router]);
-
-    const handleLogout = async () => {
-        try {
-            await fetch('/api/auth/logout', { method: 'POST' });
-            router.push('/home');
-        } catch (error) {
-            console.error('Logout failed:', error);
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const res = await fetch('/api/profile');
+        if (!res.ok) {
+          throw new Error('Failed to fetch profile');
         }
+        const data = await res.json();
+        setUser(data.user);
+        setStats(data.stats);
+      } catch (err) {
+        console.error(err);
+        setError('Could not load profile data');
+      } finally {
+        setLoading(false);
+      }
     };
 
-    fetchProfile();
-  }, []);
+    if (session?.user) {
+      fetchProfile();
+    } else {
+      setLoading(false);
+    }
+  }, [session]);
 
   const handleLogout = async () => {
     await signOut({ callbackUrl: "/login" });
@@ -122,7 +118,7 @@ export default function ProfilePage() {
     return formatDate(dateString);
   };
 
-  if (loading) {
+  if (status === "loading" || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
         <div className="text-center">
@@ -131,6 +127,11 @@ export default function ProfilePage() {
         </div>
       </div>
     );
+  }
+
+  if (!session) {
+    router.push('/login');
+    return null;
   }
 
   if (error) {
@@ -193,7 +194,7 @@ export default function ProfilePage() {
                     />
                   ) : (
                     <div className="w-24 h-24 rounded-full bg-gradient-to-br from-emerald-500 to-teal-400 flex items-center justify-center text-3xl font-bold text-white shadow-lg">
-                      {user?.name?.charAt(0).toUpperCase()}
+                      {user?.name?.charAt(0).toUpperCase() || session?.user?.name?.charAt(0).toUpperCase() || "U"}
                     </div>
                   )}
                   <button className="absolute bottom-0 right-0 p-2 bg-white rounded-full shadow-md border border-gray-200 hover:bg-gray-50 transition-colors">
@@ -201,18 +202,18 @@ export default function ProfilePage() {
                   </button>
                 </div>
 
-                <h2 className="text-xl font-bold text-gray-900">{user?.name}</h2>
-                <p className="text-gray-500 text-sm mb-2">{user?.email}</p>
+                <h2 className="text-xl font-bold text-gray-900">{user?.name || session?.user?.name}</h2>
+                <p className="text-gray-500 text-sm mb-2">{user?.email || session?.user?.email}</p>
                 
                 <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-sm font-medium">
                   <FiUserCheck />
-                  {user?.plan} Plan
+                  {user?.plan || "Free"} Plan
                 </div>
 
                 <div className="mt-6 w-full">
                   <div className="flex items-center justify-between text-sm text-gray-600 mb-1">
                     <span>Storage</span>
-                    <span>{user?.storageUsed?.toFixed(1)}GB / {user?.storageTotal}GB</span>
+                    <span>{user?.storageUsed?.toFixed(1) || "0"}GB / {user?.storageTotal || "5"}GB</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
                     <div
@@ -223,7 +224,7 @@ export default function ProfilePage() {
                 </div>
 
                 <div className="mt-4 text-xs text-gray-500">
-                  Last active {formatLastActive(user?.lastActive || "")}
+                  Last active {formatLastActive(user?.lastActive || new Date().toISOString())}
                 </div>
               </div>
             </div>
@@ -300,7 +301,7 @@ export default function ProfilePage() {
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-sm text-gray-500">Total Notes</p>
-                        <p className="text-2xl font-bold text-gray-900 mt-1">{stats.totalNotes}</p>
+                        <p className="text-2xl font-bold text-gray-900 mt-1">{stats.totalNotes || 0}</p>
                       </div>
                       <div className="p-3 bg-emerald-50 rounded-xl">
                         <FaFileAlt className="text-emerald-600 text-xl" />
@@ -308,7 +309,7 @@ export default function ProfilePage() {
                     </div>
                     <div className="mt-4 flex items-center text-sm text-emerald-600">
                       <FiTrendingUp className="mr-1" />
-                      <span>+{stats.last7Days} this week</span>
+                      <span>+{stats.last7Days || 0} this week</span>
                     </div>
                   </div>
 
@@ -316,7 +317,7 @@ export default function ProfilePage() {
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-sm text-gray-500">Notebooks</p>
-                        <p className="text-2xl font-bold text-gray-900 mt-1">{stats.notes}</p>
+                        <p className="text-2xl font-bold text-gray-900 mt-1">{stats.notes || 0}</p>
                       </div>
                       <div className="p-3 bg-amber-50 rounded-xl">
                         <FaBook className="text-amber-600 text-xl" />
@@ -331,7 +332,7 @@ export default function ProfilePage() {
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-sm text-gray-500">Canvases</p>
-                        <p className="text-2xl font-bold text-gray-900 mt-1">{stats.canvases}</p>
+                        <p className="text-2xl font-bold text-gray-900 mt-1">{stats.canvases || 0}</p>
                       </div>
                       <div className="p-3 bg-blue-50 rounded-xl">
                         <FaBrush className="text-blue-600 text-xl" />
@@ -346,7 +347,7 @@ export default function ProfilePage() {
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-sm text-gray-500">Active Projects</p>
-                        <p className="text-2xl font-bold text-gray-900 mt-1">{stats.activeProjects}</p>
+                        <p className="text-2xl font-bold text-gray-900 mt-1">{stats.activeProjects || 0}</p>
                       </div>
                       <div className="p-3 bg-purple-50 rounded-xl">
                         <FaChartLine className="text-purple-600 text-xl" />
@@ -370,7 +371,7 @@ export default function ProfilePage() {
                         <FaEnvelope className="text-gray-500" />
                         <div>
                           <p className="text-sm text-gray-500">Email Address</p>
-                          <p className="font-medium">{user?.email}</p>
+                          <p className="font-medium">{user?.email || session?.user?.email}</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
@@ -386,7 +387,7 @@ export default function ProfilePage() {
                         <FaGlobe className="text-gray-500" />
                         <div>
                           <p className="text-sm text-gray-500">Plan</p>
-                          <p className="font-medium">{user?.plan} Plan</p>
+                          <p className="font-medium">{user?.plan || "Free"} Plan</p>
                         </div>
                       </div>
                     </div>
@@ -394,7 +395,7 @@ export default function ProfilePage() {
 
                   <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
                     <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                      <FaDesktop className="text-blue-600" />
+                      <TbDeviceDesktop className="text-blue-600" />
                       Usage Analytics
                     </h3>
                     <div className="space-y-4">
@@ -421,7 +422,7 @@ export default function ProfilePage() {
                           <FaDatabase className="text-purple-600 text-xl" />
                           <div>
                             <p className="text-sm text-gray-500">Storage Used</p>
-                            <p className="font-medium">{user?.storageUsed?.toFixed(1)} GB</p>
+                            <p className="font-medium">{user?.storageUsed?.toFixed(1) || "0"} GB</p>
                           </div>
                         </div>
                       </div>
