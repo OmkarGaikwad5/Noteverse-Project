@@ -134,7 +134,7 @@ const NoteSelector: React.FC = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white p-4 sm:p-6">
+        <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white px-4 sm:px-6 pt-0 pb-6">
             <div className="max-w-7xl mx-auto">
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 sm:mb-8 gap-4">
@@ -149,14 +149,6 @@ const NoteSelector: React.FC = () => {
                     
                     <div className="flex items-center gap-3">
                         <BinButton animate={isDeleting} />
-                        <button
-                            onClick={() => setShowNewModal(true)}
-                            className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg font-semibold hover:shadow-lg transition-all duration-300 hover:scale-105 text-sm sm:text-base"
-                        >
-                            <FiPlus className="text-sm sm:text-lg" />
-                            <span className="hidden sm:inline">New Note</span>
-                            <span className="sm:hidden">New</span>
-                        </button>
                     </div>
                 </div>
 

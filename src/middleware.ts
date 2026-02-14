@@ -28,7 +28,7 @@ export async function middleware(request: NextRequest) {
 
   // 2. If already logged in, prevent visiting login/signup
   if ((path === "/login" || path === "/signup") && isLoggedIn) {
-    return NextResponse.redirect(new URL("/library", request.url));
+    return NextResponse.redirect(new URL("/home", request.url));
   }
 
   return NextResponse.next();
@@ -42,6 +42,7 @@ export const config = {
     "/home",
     "/library",
     "/profile",
+    "/canvas/:path*",
     "/notebook/:path*",
     "/note/:path*",
   ],
