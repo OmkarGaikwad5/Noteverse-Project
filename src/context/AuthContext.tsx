@@ -1,180 +1,192 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { useSession, signOut as nextAuthSignOut } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
+import React, { createContext, useContext, useEffect, useRef, useState } from "react";
+import { useSession, signOut as nextAuthSignOut } from "next-auth/react";
+import { useRouter } from "next/navigation";
 
 export interface User {
   id: string;
   name?: string | null;
   email?: string | null;
   image?: string | null;
-  isGuest?: boolean;
-  provider?: string;
+  provider?: "oauth" | "credentials" | "guest";
 }
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
   isAuthenticated: boolean;
-  refresh: () => Promise<void>;
-  logout: () => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   signup: (name: string, email: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
+  refresh: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const useAuth = () => {
   const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
+  if (!ctx) throw new Error("useAuth must be used within AuthProvider");
   return ctx;
 };
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const { data: session, status } = useSession();
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  // Sync NextAuth session with custom auth state
-  useEffect(() => {
-    if (status === 'loading') {
-      setLoading(true);
-      return;
-    }
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
-    if (session?.user) {
-      // Convert NextAuth user to your custom User format
+  const initialized = useRef(false);
+
+  /* =========================================================
+     RESOLVE USER (RUN ONLY ONCE AFTER NEXTAUTH READY)
+  ========================================================= */
+const resolveUser = async () => {
+
+  // Wait until next-auth finishes checking cookies
+  if (status === "loading") return;
+
+  try {
+
+    /* 1️⃣ GOOGLE LOGIN (NextAuth priority) */
+    if (status === "authenticated" && session?.user) {
       setUser({
-        id: session.user.id || session.user.email || '',
+        id: session.user.email!,
         name: session.user.name,
         email: session.user.email,
         image: session.user.image,
-        provider: session.user.provider || 'oauth',
-        isGuest: false
+        provider: "oauth"
       });
-      setLoading(false);
-    } else {
-      // Try to fetch from your custom API if no NextAuth session
-      fetchUser();
-    }
-  }, [session, status]);
 
-  const fetchUser = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch('/api/auth/me');
-      if (res.ok) {
-        const data = await res.json();
-        setUser(data.user ? { ...data.user, provider: 'credentials' } : null);
-      } else {
-        setUser(null);
-      }
-    } catch (e) {
-      console.error('Error fetching user:', e);
-      setUser(null);
-    } finally {
       setLoading(false);
+      return;
     }
+
+
+    /* 2️⃣ CUSTOM LOGIN — ONLY IF COOKIE EXISTS */
+    const hasPossibleAuthCookie =
+      document.cookie.includes("token") ||
+      document.cookie.includes("next-auth.session-token") ||
+      document.cookie.includes("__Secure-next-auth.session-token");
+
+
+    if (!hasPossibleAuthCookie) {
+      setUser(null);
+      setLoading(false);
+      return;
+    }
+
+    // Now safe to call backend
+    const res = await fetch("/api/auth/me", {
+      credentials: "include",
+      cache: "no-store"
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      setUser({ ...data.user, provider: "credentials" });
+    } else {
+      // 401 or expired cookie
+      setUser(null);
+    }
+
+  } catch (err) {
+    console.error("Auth resolve failed:", err);
+    setUser(null);
+  }
+
+  setLoading(false);
+};
+
+
+  /* RUN ONLY ONCE */
+  useEffect(() => {
+  resolveUser();
+}, [status]);
+
+
+  /* =========================================================
+     MANUAL REFRESH (used after login/signup)
+  ========================================================= */
+  const refresh = async () => {
+    setLoading(true);
+    await resolveUser();
   };
 
+  /* =========================================================
+     LOGIN
+  ========================================================= */
   const login = async (email: string, password: string) => {
     setLoading(true);
-    try {
-      const res = await fetch('/api/auth/custom-login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
-      });
 
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || 'Login failed');
-      }
+    const res = await fetch("/api/auth/custom-login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+      credentials: "include"
+    });
 
-      const data = await res.json();
-      setUser({ ...data.user, provider: 'credentials' });
-      router.push('/home');
-    } catch (error) {
-      console.error('Login error:', error);
-      throw error;
-    } finally {
+    if (!res.ok) {
       setLoading(false);
+      throw new Error("Login failed");
     }
+
+    await refresh();
+    router.replace("/home");
   };
 
+  /* =========================================================
+     SIGNUP
+  ========================================================= */
   const signup = async (name: string, email: string, password: string) => {
     setLoading(true);
-    try {
-      const res = await fetch('/api/auth/custom-signup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password })
-      });
 
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || 'Signup failed');
-      }
+    const res = await fetch("/api/auth/custom-signup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, email, password }),
+      credentials: "include"
+    });
 
-      const data = await res.json();
-      setUser({ ...data.user, provider: 'credentials' });
-      router.push('/home');
-    } catch (error) {
-      console.error('Signup error:', error);
-      throw error;
-    } finally {
+    if (!res.ok) {
       setLoading(false);
+      throw new Error("Signup failed");
     }
+
+    await refresh();
+    router.replace("/home");
   };
 
+  /* =========================================================
+     LOGOUT
+  ========================================================= */
   const logout = async () => {
     setLoading(true);
+
     try {
-      // Call custom logout API
-      await fetch('/api/auth/logout', { 
-        method: 'POST',
-        credentials: 'include'
-      });
-      
-      // Also sign out from NextAuth
+      await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
       await nextAuthSignOut({ redirect: false });
-      
-      // Clear all storage
-      if (typeof window !== 'undefined') {
-        localStorage.clear();
-        sessionStorage.clear();
-      }
-      
-      setUser(null);
-      
-      // Force hard navigation to clear all state
-      window.location.href = '/';
-    } catch (e) {
-      console.error('Logout error:', e);
-      setUser(null);
-      window.location.href = '/';
-    } finally {
-      setLoading(false);
-    }
+    } catch {}
+
+    setUser(null);
+    router.replace("/");
+    setLoading(false);
   };
 
   return (
-    <AuthContext.Provider 
-      value={{ 
-        user, 
-        loading, 
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
         isAuthenticated: !!user,
-        refresh: fetchUser, 
-        logout,
         login,
-        signup
+        signup,
+        logout,
+        refresh
       }}
     >
       {children}
     </AuthContext.Provider>
   );
 };
-
-export default AuthContext;
