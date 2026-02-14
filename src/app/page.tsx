@@ -4,9 +4,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { FaPenFancy, FaBook, FaMagic, FaPalette, FaRocket, FaUsers, FaLock, FaSync, FaStar, FaArrowRight, FaChevronDown } from "react-icons/fa";
 import { useEffect, useState } from "react";
+import { useAuth } from '@/context/AuthContext';
 
 export default function Home() {
   const [scrollY, setScrollY] = useState(0);
+  const { user, loading, logout } = useAuth();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -15,6 +17,8 @@ export default function Home() {
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  // auth provided by AuthProvider
 
   const features = [
     {
@@ -98,20 +102,41 @@ export default function Home() {
                 <span className="bg-gradient-to-r from-purple-600 to-purple-400 bg-clip-text text-transparent">Verse</span>
               </span>
             </div>
-            
+
             <div className="hidden md:flex items-center space-x-8">
               <Link href="#features" className="text-gray-600 hover:text-blue-600 transition-colors">Features</Link>
               <Link href="#testimonials" className="text-gray-600 hover:text-blue-600 transition-colors">Testimonials</Link>
               <Link href="#pricing" className="text-gray-600 hover:text-blue-600 transition-colors">Pricing</Link>
-              <Link href="/login" className="text-gray-600 hover:text-blue-600 transition-colors">Login</Link>
             </div>
-            
-            <Link
-              href="/home"
-              className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-2 rounded-lg font-semibold hover:shadow-lg transition-all duration-300 hover:scale-105"
-            >
-              Get Started
-            </Link>
+
+            <div className="flex items-center gap-4">
+              {loading ? (
+                <div className="w-24 h-8 bg-white/60 rounded-xl animate-pulse" />
+              ) : !user ? (
+                <>
+                  <Link href="/login" className="hidden sm:inline text-gray-600 hover:text-blue-600 transition-colors">Login</Link>
+                  <Link
+                    href="/signup"
+                    className="relative inline-flex items-center px-4 py-2 rounded-xl font-semibold text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:shadow-2xl transform hover:scale-105 transition-all duration-300"
+                  >
+                    Sign Up
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <div className="hidden sm:flex items-center gap-3 bg-white/60 backdrop-blur rounded-full px-3 py-1 border border-gray-200">
+                    <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white font-semibold">{(user.name || user.email || 'U').charAt(0)}</div>
+                    <div className="flex flex-col">
+                      <span className="text-sm font-medium text-gray-800">{user.name ?? user.email}</span>
+                      <span className="text-xs text-gray-500">Signed in</span>
+                    </div>
+                  </div>
+                  <button onClick={logout} className="inline-flex items-center px-4 py-2 rounded-xl bg-white border border-gray-200 hover:bg-red-50 text-red-600 font-semibold shadow-sm transition transform hover:scale-105">
+                    Logout
+                  </button>
+                </>
+              )}
+            </div>
           </div>
         </div>
       </nav>
@@ -323,7 +348,8 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Footer */}
+      {/* Navbar is moved to layout for consistent cross-page header */}
+
       <footer className="bg-gray-900 text-white py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row justify-between items-center">
@@ -343,16 +369,6 @@ export default function Home() {
             </div>
             
             <div className="grid grid-cols-2 md:grid-cols-3 gap-8">
-              <div>
-                <h4 className="font-bold mb-4">Product</h4>
-                <ul className="space-y-2 text-gray-400">
-                  <li><Link href="/features" className="hover:text-white transition-colors">Features</Link></li>
-                  <li><Link href="/pricing" className="hover:text-white transition-colors">Pricing</Link></li>
-                  <li><Link href="/templates" className="hover:text-white transition-colors">Templates</Link></li>
-                  <li><Link href="/integrations" className="hover:text-white transition-colors">Integrations</Link></li>
-                </ul>
-              </div>
-              
               <div>
                 <h4 className="font-bold mb-4">Company</h4>
                 <ul className="space-y-2 text-gray-400">

@@ -33,7 +33,10 @@ function Button({
     icon: "h-9 w-9",
   };
 
-  const variantClasses: Record<string, VariantState> = {
+  const variantClasses: Record<
+    NonNullable<ButtonProps["variant"]>,
+    VariantState
+  > = {
     primary: {
       active:
         "bg-primary text-primary-foreground hover:bg-primary/90 active:bg-primary/95",
@@ -55,18 +58,15 @@ function Button({
       inactive: "border border-input bg-background hover:bg-accent",
     },
     destructive: {
-      active:
-        "bg-destructive text-destructive-foreground hover:bg-destructive/90 active:bg-destructive/95 focus-visible:ring-destructive",
-      inactive:
-        "bg-destructive text-destructive-foreground hover:bg-destructive/90 active:bg-destructive/95 focus-visible:ring-destructive",
+      active: "bg-red-500 text-white hover:bg-red-600",
+      inactive: "bg-red-500 text-white hover:bg-red-600",
     },
   };
 
   const disabledClasses =
     "bg-muted text-muted-foreground opacity-50 cursor-not-allowed";
 
-  const currentVariant =
-    variantClasses[variant] || variantClasses.primary;
+  const currentVariant = variantClasses[variant];
 
   return (
     <button
