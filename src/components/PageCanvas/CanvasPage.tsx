@@ -1,6 +1,6 @@
 
 'use client'
-import { Stage, Layer, Line, Text, Circle, Rect, Star, RegularPolygon, Arrow as KonvaArrow, Path } from 'react-konva';
+import { Stage, Layer, Line, Text, Circle, Rect, Star, RegularPolygon, Arrow as KonvaArrow, Path, Image as KonvaImage } from 'react-konva';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from '@/components/custom/button';
 import { FaPen, FaEraser, FaFont, FaTrash, FaPlus, FaArrowLeft, FaArrowRight, FaUndo, FaRedo, FaImage, FaMinus, FaShapes } from 'react-icons/fa';
@@ -78,6 +78,9 @@ export default function CanvasPage({ pageId, initialData, onSave }: CanvasPagePr
     const [previewShape, setPreviewShape] = useState<ShapeData | null>(null);
     const [selectedShapeId, setSelectedShapeId] = useState<string | null>(null);
     const textInputRef = useRef<HTMLTextAreaElement>(null);
+
+    // Loaded HTMLImageElements for any image-markdown in textBoxes
+    const [loadedImages, setLoadedImages] = useState<Record<string, HTMLImageElement | null>>({});
 
     const [scale, setScale] = useState(1);
     const [stagePos, setStagePos] = useState({ x: 0, y: 0 });
@@ -329,6 +332,31 @@ export default function CanvasPage({ pageId, initialData, onSave }: CanvasPagePr
         }
     };
 
+    // Load images when textBoxes contain markdown image links
+    useEffect(() => {
+        textBoxes.forEach(box => {
+            const imgMatch = box.text && box.text.match(/^!\[[^\]]*\]\(([^)]+)\)/);
+            if (imgMatch && imgMatch[1] && !loadedImages[box.id]) {
+                const url = imgMatch[1];
+                const img = new window.Image();
+                img.crossOrigin = 'anonymous';
+                img.onload = () => {
+                    setLoadedImages(prev => ({ ...prev, [box.id]: img }));
+                };
+                img.onerror = () => {
+                    setLoadedImages(prev => ({ ...prev, [box.id]: null }));
+                };
+                img.src = url;
+            }
+        });
+    }, [textBoxes]);
+
+    // Support mobile tap to edit text (some mobile browsers don't send dblclick reliably)
+    const handleTextTap = (id: string) => {
+        const newBoxes = textBoxes.map(box => box.id === id ? { ...box, isEditing: true } : box);
+        updateTextBoxes(newBoxes);
+    };
+
     // --- Render ---
     return (
         <div className="relative bg-transparent w-full h-full overflow-hidden">
@@ -387,8 +415,44 @@ export default function CanvasPage({ pageId, initialData, onSave }: CanvasPagePr
 
                     {shapes.map(shape => renderShape(shape))}
 
-                    {textBoxes.map(box => (
-                        !box.isEditing && (
+                    {textBoxes.map(box => {
+                        if (box.isEditing) return null;
+                        const imgMatch = box.text && box.text.match(/^!\[[^\]]*\]\(([^)]+)\)/);
+                        if (imgMatch) {
+                            const imgEl = loadedImages[box.id];
+                            if (imgEl) {
+                                const maxW = 300;
+                                const scale = imgEl.width > maxW ? maxW / imgEl.width : 1;
+                                const w = imgEl.width * scale;
+                                const h = imgEl.height * scale;
+                                return (
+                                    <KonvaImage
+                                        key={box.id}
+                                        x={box.x}
+                                        y={box.y}
+                                        image={imgEl}
+                                        width={w}
+                                        height={h}
+                                        draggable={mode !== 'text' && mode !== 'pen' && mode !== 'eraser'}
+                                        onClick={() => handleTextTap(box.id)}
+                                        onTap={() => handleTextTap(box.id)}
+                                    />
+                                );
+                            }
+                            // If image not loaded yet, show placeholder text
+                            return (
+                                <Text
+                                    key={box.id}
+                                    x={box.x}
+                                    y={box.y}
+                                    text={'[loading image]'}
+                                    fontSize={16}
+                                    fill={'#666'}
+                                />
+                            );
+                        }
+
+                        return (
                             <Text
                                 key={box.id}
                                 x={box.x}
@@ -397,9 +461,11 @@ export default function CanvasPage({ pageId, initialData, onSave }: CanvasPagePr
                                 fontSize={20}
                                 draggable={mode !== 'text' && mode !== 'pen' && mode !== 'eraser'}
                                 onDblClick={() => handleTextDblClick(box.id)}
+                                onClick={() => handleTextTap(box.id)}
+                                onTap={() => handleTextTap(box.id)}
                             />
-                        )
-                    ))}
+                        );
+                    })}
 
                     {previewShape && renderShape(previewShape, true)}
                 </Layer>
@@ -425,7 +491,9 @@ export default function CanvasPage({ pageId, initialData, onSave }: CanvasPagePr
                             outline: 'none',
                             resize: 'none',
                             color: 'black',
-                            fontFamily: 'sans-serif'
+                            fontFamily: 'sans-serif',
+                            zIndex: 9999,
+                            pointerEvents: 'auto'
                         }}
                         autoFocus
                     />

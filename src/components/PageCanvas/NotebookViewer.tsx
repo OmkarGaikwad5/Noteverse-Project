@@ -14,10 +14,9 @@ import { NotebookSyncProvider, useNotebookSync } from '@/context/NotebookSyncCon
 
 interface NotebookViewerProps {
     notebookId: string;
-    userId: string;
 }
 
-function NotebookViewerContent({ notebookId, userId }: NotebookViewerProps) {
+function NotebookViewerContent({ notebookId }: NotebookViewerProps) {
     const [pageIndex, setPageIndex] = useState(0);
     const [pageData, setPageData] = useState<PageContent | null>(null);
     const [loading, setLoading] = useState(true);
@@ -86,7 +85,7 @@ function NotebookViewerContent({ notebookId, userId }: NotebookViewerProps) {
                         </Button>
                     </div>
                     <div className="h-4 w-[1px] bg-border mx-1"></div>
-                    <Button onClick={handleAddPage} size="sm" className="bg-primary hover:bg-primary-hover text-white shadow-md hover:shadow-lg transition-all active:scale-95 gap-2">
+                    <Button onClick={handleAddPage} size="sm" className="bg-primary hover:bg-primary-hover text-black shadow-md hover:shadow-lg transition-all active:scale-95 gap-2">
                         <FaPlus className="w-3 h-3" /> Add Page
                     </Button>
                 </div>
@@ -127,21 +126,13 @@ export default function NotebookViewer(props: Omit<NotebookViewerProps, "userId"
         return <div className="p-8">Please log in to view this notebook.</div>;
     }
 
-    // Safely extract a user identifier without using `any`.
-    const user = session.user;
-    let userId: string = '';
-    if (user) {
-        const idField = (user as Record<string, unknown>)['id'];
-        if (typeof idField === 'string' && idField.length > 0) {
-            userId = idField;
-        } else if (typeof user.email === 'string' && user.email.length > 0) {
-            userId = user.email;
-        }
-    }
+    type SessionUser = { id?: string; email?: string } | undefined;
+    const userObj = session.user as SessionUser;
+    const userId: string = userObj?.id ?? userObj?.email ?? '';
 
     return (
         <NotebookSyncProvider userId={userId}>
-            <NotebookViewerContent notebookId={props.notebookId} userId={userId} />
+            <NotebookViewerContent notebookId={props.notebookId} />
         </NotebookSyncProvider>
     );
 }
