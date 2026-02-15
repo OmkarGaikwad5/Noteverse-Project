@@ -98,20 +98,26 @@ export default function MainToolbar({
                     </PopoverTrigger>
                     <PopoverContent className="w-44 p-2 bg-surface/90 backdrop-blur-xl border-border/20 shadow-xl rounded-xl" sideOffset={10}>
                         <div className="flex flex-col gap-1">
-                            {[
-                                { id: 'standard', label: 'Standard Eraser' },
-                                { id: 'precise', label: 'Precise Eraser' },
-                                { id: 'stroke', label: 'Stroke Eraser' }
-                            ].map((item) => (
-                                <Button
-                                    key={item.id}
-                                    variant="ghost"
-                                    className={`justify-start h-9 text-sm font-medium transition-colors ${eraserMode === item.id ? 'bg-primary-soft text-primary' : 'hover:bg-background text-ink-primary'}`}
-                                    onClick={() => { setEraserMode(item.id as any); setMode('eraser'); }}
-                                >
-                                    {item.label}
-                                </Button>
-                            ))}
+                            {
+                                (() => {
+                                    type EraserMode = 'standard' | 'precise' | 'stroke';
+                                    const options: { id: EraserMode; label: string }[] = [
+                                        { id: 'standard', label: 'Standard Eraser' },
+                                        { id: 'precise', label: 'Precise Eraser' },
+                                        { id: 'stroke', label: 'Stroke Eraser' }
+                                    ];
+                                    return options.map((item) => (
+                                        <Button
+                                            key={item.id}
+                                            variant="ghost"
+                                            className={`justify-start h-9 text-sm font-medium transition-colors ${eraserMode === item.id ? 'bg-primary-soft text-primary' : 'hover:bg-background text-ink-primary'}`}
+                                            onClick={() => { setEraserMode(item.id); setMode('eraser'); }}
+                                        >
+                                            {item.label}
+                                        </Button>
+                                    ));
+                                })()
+                            }
                         </div>
                     </PopoverContent>
                 </Popover>
@@ -141,30 +147,36 @@ export default function MainToolbar({
                     </PopoverTrigger>
                     <PopoverContent className="w-72 p-3 bg-surface/90 backdrop-blur-xl border-border/20 shadow-xl rounded-xl" align="start" sideOffset={10}>
                         <div className="grid grid-cols-5 gap-2">
-                            {[
-                                { id: 'rectangle', icon: <FaSquare /> },
-                                { id: 'circle', icon: <FaCircle /> },
-                                { id: 'triangle', icon: <FaPlay className="-rotate-90" /> },
-                                { id: 'line', icon: <FaLine /> },
-                                { id: 'arrow', icon: <FaLongArrowAltRight /> },
-                                { id: 'star', icon: <FaStar /> },
-                                { id: 'diamond', icon: <FaGem /> },
-                                { id: 'polygon', icon: <FaDrawPolygon /> },
-                                { id: 'bubble', icon: <FaComment /> },
-                                { id: 'heart', icon: <FaHeart /> },
-                                { id: 'cloud', icon: <FaCloud /> },
-                            ].map((shape) => (
-                                <Button
-                                    key={shape.id}
-                                    variant="ghost"
-                                    size="icon"
-                                    className={`aspect-square hover:bg-primary hover:text-white transition-colors ${selectedShape === shape.id ? 'bg-primary text-white' : 'text-ink-secondary'}`}
-                                    onClick={() => { setSelectedShape(shape.id as any); setMode('shape'); }}
-                                    title={shape.id}
-                                >
-                                    {shape.icon}
-                                </Button>
-                            ))}
+                            {
+                                (() => {
+                                    type ShapeId = 'rectangle' | 'circle' | 'triangle' | 'line' | 'arrow' | 'star' | 'diamond' | 'polygon' | 'bubble' | 'heart' | 'cloud';
+                                    const shapes: { id: ShapeId; icon: React.ReactNode }[] = [
+                                        { id: 'rectangle', icon: <FaSquare /> },
+                                        { id: 'circle', icon: <FaCircle /> },
+                                        { id: 'triangle', icon: <FaPlay className="-rotate-90" /> },
+                                        { id: 'line', icon: <FaLine /> },
+                                        { id: 'arrow', icon: <FaLongArrowAltRight /> },
+                                        { id: 'star', icon: <FaStar /> },
+                                        { id: 'diamond', icon: <FaGem /> },
+                                        { id: 'polygon', icon: <FaDrawPolygon /> },
+                                        { id: 'bubble', icon: <FaComment /> },
+                                        { id: 'heart', icon: <FaHeart /> },
+                                        { id: 'cloud', icon: <FaCloud /> },
+                                    ];
+                                    return shapes.map((shape) => (
+                                        <Button
+                                            key={shape.id}
+                                            variant="ghost"
+                                            size="icon"
+                                            className={`aspect-square hover:bg-primary hover:text-white transition-colors ${selectedShape === shape.id ? 'bg-primary text-white' : 'text-ink-secondary'}`}
+                                            onClick={() => { setSelectedShape(shape.id); setMode('shape'); }}
+                                            title={shape.id}
+                                        >
+                                            {shape.icon}
+                                        </Button>
+                                    ));
+                                })()
+                            }
                         </div>
                     </PopoverContent>
                 </Popover>

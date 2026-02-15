@@ -127,7 +127,17 @@ export default function NotebookViewer(props: Omit<NotebookViewerProps, "userId"
         return <div className="p-8">Please log in to view this notebook.</div>;
     }
 
-    const userId = (session.user as any).id || session.user.email;
+    // Safely extract a user identifier without using `any`.
+    const user = session.user;
+    let userId: string = '';
+    if (user) {
+        const idField = (user as Record<string, unknown>)['id'];
+        if (typeof idField === 'string' && idField.length > 0) {
+            userId = idField;
+        } else if (typeof user.email === 'string' && user.email.length > 0) {
+            userId = user.email;
+        }
+    }
 
     return (
         <NotebookSyncProvider userId={userId}>
