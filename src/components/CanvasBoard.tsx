@@ -163,6 +163,7 @@ export default function MicrosoftStyleCanvasBoard({ noteId }: { noteId: string }
   
   // Refs
   const stageRef = useRef<Konva.Stage | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const shapeStart = useRef<{ x: number; y: number } | null>(null);
   const [selectedElement, setSelectedElement] = useState<{
     type: 'shape' | 'text' | 'sticky';
@@ -233,15 +234,31 @@ export default function MicrosoftStyleCanvasBoard({ noteId }: { noteId: string }
   // Handle window resize
   useEffect(() => {
     const handleResize = () => {
-      setStageSize({
-        width: window.innerWidth - (showToolbar ? 256 : 0),
-        height: window.innerHeight - 64
-      });
+      // Prefer container size so the canvas fits the layout responsively
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (rect) {
+        setStageSize({
+          width: Math.max(320, Math.floor(rect.width)),
+          height: Math.max(240, Math.floor(rect.height))
+        });
+      } else {
+        setStageSize({
+          width: Math.max(320, window.innerWidth - (showToolbar ? 256 : 0)),
+          height: Math.max(240, window.innerHeight - 64)
+        });
+      }
     };
 
     handleResize();
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    // Also observe container resize (in case of layout changes like toolbar toggles)
+    const RO = (window as any).ResizeObserver;
+    const ro = typeof RO === 'function' ? new RO(() => handleResize()) : null;
+    if (containerRef.current && ro) ro.observe(containerRef.current);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      if (containerRef.current && ro && typeof ro.unobserve === 'function') ro.unobserve(containerRef.current);
+    };
   }, [showToolbar]);
 
   // History management
@@ -699,7 +716,7 @@ export default function MicrosoftStyleCanvasBoard({ noteId }: { noteId: string }
         {/* Side Toolbar */}
         {showToolbar && (
           <div 
-            className={`w-64 bg-white border-r border-gray-200 shadow-lg overflow-y-auto transition-all duration-300 ${
+            className={`hidden md:block w-64 bg-white border-r border-gray-200 shadow-lg overflow-y-auto transition-all duration-300 ${
               showToolbar ? 'translate-x-0' : '-translate-x-full'
             }`}
           >
@@ -963,7 +980,7 @@ export default function MicrosoftStyleCanvasBoard({ noteId }: { noteId: string }
         )}
 
         {/* Main Canvas Area */}
-        <div className="flex-1 relative overflow-hidden">
+        <div ref={containerRef} className="flex-1 relative overflow-hidden min-h-0">
           {/* Floating Toolbar for quick access */}
           <div className="absolute top-4 left-4 z-10 bg-white rounded-lg shadow-lg border border-gray-200 p-2">
             <div className="flex items-center gap-1">

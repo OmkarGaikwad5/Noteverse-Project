@@ -401,8 +401,8 @@ export default function Notebook({ noteId }: { noteId: string }) {
         key={index}
         className="group relative flex items-start gap-3"
       >
-        {/* Line number */}
-        <div className="w-8 flex-shrink-0 pt-3 text-right">
+        {/* Line number (hidden on very small screens) */}
+        <div className="hidden sm:block w-8 flex-shrink-0 pt-3 text-right">
           <span className="text-xs font-mono text-gray-400 select-none">
             {index + 1}
           </span>
@@ -538,7 +538,7 @@ export default function Notebook({ noteId }: { noteId: string }) {
     };
 
     return (
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-4xl mx-auto px-2 sm:px-6">
         <textarea
           ref={fullTextRef}
           value={currentLines.join('\n')}
@@ -909,7 +909,7 @@ export default function Notebook({ noteId }: { noteId: string }) {
         </div>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-auto p-6 bg-gradient-to-b from-white to-gray-50">
+        <div className="flex-1 overflow-auto p-4 sm:p-6 bg-gradient-to-b from-white to-gray-50">
           {mode === 'line' ? (
             <div className="max-w-4xl mx-auto">
               {currentLines.length > 0 ? (
