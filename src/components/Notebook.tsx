@@ -272,30 +272,68 @@ export default function Notebook({ noteId }: { noteId: string }) {
   };
 
   const copyToClipboard = () => {
-    const content = currentLines.join('\n');
-    navigator.clipboard.writeText(content).then(() => {
-      // Optional: Show a success message
-    }).catch(err => {
-      console.error('Failed to copy:', err);
-    });
+    const content = pages[pageIndex]?.lines?.join('\n') || currentLines.join('\n');
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(content).catch(err => console.error('Failed to copy:', err));
+    } else {
+      // Fallback for older browsers
+      try {
+        const textarea = document.createElement('textarea');
+        textarea.value = content;
+        textarea.style.position = 'fixed';
+        textarea.style.left = '-9999px';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      } catch (err) {
+        console.error('Fallback copy failed:', err);
+      }
+    }
   };
 
   const insertImage = () => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
+    input.style.display = 'none';
     input.onchange = (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (file) {
         const reader = new FileReader();
         reader.onload = (e) => {
           const imageUrl = e.target?.result as string;
-          handleLineChange(currentLines.length, `![Image](${imageUrl})`);
+          const idx = pages[pageIndex]?.lines?.length ?? currentLines.length;
+          handleLineChange(idx, `![Image](${imageUrl})`);
           addLine();
+          // Ensure the newly inserted line is visible and focused in Line mode,
+          // or focus the full page editor when in Full mode.
+          setTimeout(() => {
+            if (mode === 'line') {
+              setSelectedLineIndex(idx);
+              const el = lineInputRefs.current[idx];
+              if (el) {
+                el.focus();
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }
+            } else {
+              if (fullTextRef.current) {
+                fullTextRef.current.focus();
+                // place caret at end
+                const val = fullTextRef.current.value;
+                fullTextRef.current.selectionStart = fullTextRef.current.selectionEnd = val.length;
+                fullTextRef.current.scrollTop = fullTextRef.current.scrollHeight;
+              }
+            }
+          }, 60);
         };
         reader.readAsDataURL(file);
       }
+      // cleanup
+      if (input.parentNode) input.parentNode.removeChild(input);
     };
+    // append to DOM then click to ensure mobile browsers allow the file picker
+    document.body.appendChild(input);
     input.click();
   };
 
@@ -303,8 +341,27 @@ export default function Notebook({ noteId }: { noteId: string }) {
     const url = prompt('Enter URL:');
     const text = prompt('Enter link text:') || url;
     if (url) {
-      handleLineChange(currentLines.length, `[${text}](${url})`);
+      const idx = pages[pageIndex]?.lines?.length ?? currentLines.length;
+      handleLineChange(idx, `[${text}](${url})`);
       addLine();
+      // Focus the inserted content similar to insertImage
+      setTimeout(() => {
+        if (mode === 'line') {
+          setSelectedLineIndex(idx);
+          const el = lineInputRefs.current[idx];
+          if (el) {
+            el.focus();
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        } else {
+          if (fullTextRef.current) {
+            fullTextRef.current.focus();
+            const val = fullTextRef.current.value;
+            fullTextRef.current.selectionStart = fullTextRef.current.selectionEnd = val.length;
+            fullTextRef.current.scrollTop = fullTextRef.current.scrollHeight;
+          }
+        }
+      }, 60);
     }
   };
 
@@ -421,6 +478,31 @@ export default function Notebook({ noteId }: { noteId: string }) {
             </button>
           )}
         </div>
+        {/* Render markdown previews for image / link */}
+        {line && (() => {
+          const imgMatch = line.match(/^!\[[^\]]*\]\(([^)]+)\)/);
+          if (imgMatch) {
+            const src = imgMatch[1];
+            return (
+              <div className="mt-2">
+                <img src={src} alt="inserted" className="max-w-full rounded shadow-sm" />
+              </div>
+            );
+          }
+
+          const linkMatch = line.match(/^\[([^\]]+)\]\(([^)]+)\)/);
+          if (linkMatch) {
+            const text = linkMatch[1];
+            const href = linkMatch[2];
+            return (
+              <div className="mt-2">
+                <a href={href} className="text-blue-600 underline" target="_blank" rel="noreferrer">{text}</a>
+              </div>
+            );
+          }
+
+          return null;
+        })()}
       </div>
     );
   };
@@ -472,6 +554,28 @@ export default function Notebook({ noteId }: { noteId: string }) {
           spellCheck={true}
           placeholder="Start writing your thoughts here..."
         />
+        {/* Full-page preview for rendered markdown (images/links) */}
+        <div className="mt-4 space-y-3">
+          {currentLines.map((ln, i) => {
+            const imgMatch = ln.match(/^!\[[^\]]*\]\(([^)]+)\)/);
+            if (imgMatch) {
+              return (
+                <div key={`img-${i}`}>
+                  <img src={imgMatch[1]} alt="inserted" className="max-w-full rounded shadow-sm" />
+                </div>
+              );
+            }
+            const linkMatch = ln.match(/^\[([^\]]+)\]\(([^)]+)\)/);
+            if (linkMatch) {
+              return (
+                <div key={`link-${i}`}>
+                  <a href={linkMatch[2]} className="text-blue-600 underline" target="_blank" rel="noreferrer">{linkMatch[1]}</a>
+                </div>
+              );
+            }
+            return null;
+          })}
+        </div>
       </div>
     );
   };
