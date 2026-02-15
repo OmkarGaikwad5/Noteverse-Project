@@ -354,4 +354,12 @@ body {
   margin: 0;
 }
 
+  /* Make interactive buttons show pointer cursor (exclude disabled) */
+  button:not([disabled]),
+  [role="button"]:not([aria-disabled="true"]):not([disabled]),
+  .btn:not([disabled]),
+  .button:not([disabled]) {
+    cursor: pointer;
+  }
+
 }
