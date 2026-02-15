@@ -1,17 +1,22 @@
 "use client";
 
-import { SessionProvider } from "next-auth/react";
-import { SyncProvider } from "@/context/SyncContext";
-import Navbar from '@/components/Navbar';
 import { ReactNode } from "react";
+import SessionWrapper from "@/components/SessionWrapper";
+import { AuthProvider } from "@/context/AuthContext";
+import { SyncProvider } from "@/context/SyncContext";
+import Navbar from "@/components/Navbar";
 
 export function Providers({ children }: { children: ReactNode }) {
   return (
-    <SessionProvider>
-      <SyncProvider>
-        <Navbar />
-        <div className="pt-20">{children}</div>
-      </SyncProvider>
-    </SessionProvider>
+    <SessionWrapper>
+      <AuthProvider>
+        <SyncProvider>
+          <Navbar />
+          <main className="min-h-[calc(100vh-64px)]">
+            {children}
+          </main>
+        </SyncProvider>
+      </AuthProvider>
+    </SessionWrapper>
   );
 }

@@ -89,7 +89,7 @@ export default function ProfilePage() {
   }, [session]);
 
   const handleLogout = async () => {
-    await signOut({ callbackUrl: "/login" });
+    await signOut({ callbackUrl: "/" });
   };
 
   const calculateStoragePercentage = () => {

@@ -4,7 +4,7 @@ import User from "@/models/User";
 import jwt from "jsonwebtoken";
 import { cookies } from "next/headers";
 import { getServerSession } from "next-auth";
-import { authOptions } from "../[...nextauth]/route";
+import { authOptions } from "@/lib/auth";
 
 const JWT_SECRET = process.env.JWT_SECRET!;
 

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
+import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/custom/button";
 import { 
   FaBook, 
@@ -40,6 +41,8 @@ interface Notebook {
 
 export default function Navbar() {
   const { data: session, status } = useSession();
+  const { user: customUser, isAuthenticated: isCustomAuth, loading: customLoading, logout: customLogout } = useAuth();
+  
   const router = useRouter();
   const pathname = usePathname();
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -54,14 +57,34 @@ export default function Navbar() {
   const mobileSearchRef = useRef<HTMLDivElement>(null);
   const mobileInputRef = useRef<HTMLInputElement>(null);
 
+  const isAuthenticated = !!(session?.user || isCustomAuth);
+  const user = session?.user || customUser;
+
   const handleLogout = async () => {
-    await signOut({ callbackUrl: "/login" });
+    try {
+      if (session?.user) {
+        await signOut({ 
+          redirect: false,
+          callbackUrl: "/" 
+        });
+      }
+      
+      await customLogout();
+      
+      if (typeof window !== 'undefined') {
+        localStorage.clear();
+        sessionStorage.clear();
+      }
+      
+      window.location.href = '/login';
+    } catch (error) {
+      console.error('Logout error:', error);
+      window.location.href = '/login';
+    }
   };
 
-  // Fetch notebooks for search
   const fetchNotebooksForSearch = async (): Promise<Notebook[]> => {
-    // Don't fetch if no session
-    if (!session?.user) return [];
+    if (!isAuthenticated) return [];
     
     try {
       const res = await fetch('/api/auth/me');
@@ -77,9 +100,8 @@ export default function Navbar() {
     }
   };
 
-  // Search functionality
   const performSearch = async (query: string) => {
-    if (!query.trim() || !session?.user) {
+    if (!query.trim() || !isAuthenticated) {
       setSearchResults([]);
       setShowSearchResults(false);
       return;
@@ -127,9 +149,8 @@ export default function Navbar() {
     }
   };
 
-  // Debounced search for desktop
   useEffect(() => {
-    if (!searchQuery.trim() || !session?.user) {
+    if (!searchQuery.trim() || !isAuthenticated) {
       setSearchResults([]);
       setShowSearchResults(false);
       return;
@@ -142,9 +163,8 @@ export default function Navbar() {
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [searchQuery, session]);
+  }, [searchQuery, isAuthenticated]);
 
-  // Close search results when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
@@ -160,7 +180,6 @@ export default function Navbar() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Handle search result click
   const handleResultClick = (result: SearchResult) => {
     router.push(`/notebook/${result._id}`);
     setSearchQuery("");
@@ -171,7 +190,6 @@ export default function Navbar() {
     mobileInputRef.current?.blur();
   };
 
-  // Clear search
   const clearSearch = () => {
     setSearchQuery("");
     setSearchResults([]);
@@ -179,7 +197,6 @@ export default function Navbar() {
     inputRef.current?.focus();
   };
 
-  // Clear mobile search
   const clearMobileSearch = () => {
     setSearchQuery("");
     setSearchResults([]);
@@ -187,7 +204,6 @@ export default function Navbar() {
     mobileInputRef.current?.focus();
   };
 
-  // Handle search submission
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) {
@@ -202,7 +218,6 @@ export default function Navbar() {
     }
   };
 
-  // Handle mobile search submission
   const handleMobileSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) {
@@ -217,9 +232,8 @@ export default function Navbar() {
     }
   };
 
-  // Create new notebook
   const handleCreateNotebook = async (type: 'canvas' | 'note') => {
-    if (!session?.user) {
+    if (!isAuthenticated) {
       router.push('/login');
       return;
     }
@@ -252,10 +266,9 @@ export default function Navbar() {
     }
   };
 
-  // Show loading state while session is loading
-  if (status === "loading") {
+  if (status === "loading" || customLoading) {
     return (
-      <nav className="sticky top-0 z-50 w-full bg-white/90 backdrop-blur-xl border-b border-gray-200 shadow-sm">
+      <nav className="sticky top-0 z-50 w-full bg-background backdrop-blur-xl">
         <div className="px-6 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-8">
@@ -269,7 +282,6 @@ export default function Navbar() {
     );
   }
 
-  // Hide navbar on auth pages
   if (pathname === "/login" || pathname === "/signup") {
     return null;
   }
@@ -282,11 +294,10 @@ export default function Navbar() {
 
   return (
     <>
-      <nav className="sticky top-0 z-50 w-full bg-white/90 backdrop-blur-xl border-b border-gray-200 shadow-sm">
+      <nav className="sticky top-0 z-50 w-full bg-background backdrop-blur-xl">
         <div className="px-6 py-3">
           <div className="flex items-center justify-between">
             
-            {/* Left Section - Logo & Navigation */}
             {!showMobileSearch && (
               <div className="flex items-center gap-8">
                 <Link href="/home" className="flex items-center gap-2 group">
@@ -320,8 +331,7 @@ export default function Navbar() {
               </div>
             )}
 
-            {/* Center Section - Search Bar (Desktop) - Only show when logged in */}
-            {!showMobileSearch && session?.user && (
+            {!showMobileSearch && isAuthenticated && (
               <div className="flex-1 max-w-xl mx-6 hidden lg:block" ref={searchRef}>
                 <form onSubmit={handleSearchSubmit} className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -355,7 +365,6 @@ export default function Navbar() {
                     </button>
                   )}
                   
-                  {/* Search Results Dropdown */}
                   {showSearchResults && (
                     <div className="absolute top-full mt-2 w-full bg-white rounded-xl shadow-2xl border border-gray-200 py-2 z-50 max-h-96 overflow-y-auto">
                       {isLoading ? (
@@ -430,8 +439,7 @@ export default function Navbar() {
               </div>
             )}
 
-            {/* Mobile Search Bar (Full Screen) */}
-            {showMobileSearch && session?.user && (
+            {showMobileSearch && isAuthenticated && (
               <div className="fixed inset-0 z-50 bg-white p-4" ref={mobileSearchRef}>
                 <div className="flex items-center gap-3 mb-6">
                   <button
@@ -476,7 +484,6 @@ export default function Navbar() {
                   )}
                 </form>
 
-                {/* Mobile Search Results */}
                 {isLoading ? (
                   <div className="flex flex-col items-center justify-center py-12">
                     <div className="w-8 h-8 border-2 border-gray-300 border-t-blue-600 rounded-full animate-spin mb-3"></div>
@@ -556,11 +563,9 @@ export default function Navbar() {
               </div>
             )}
 
-            {/* Right Section - Actions & User Menu */}
             {!showMobileSearch && (
               <div className="flex items-center gap-3">
-                {/* Mobile Search Button - Only show when logged in */}
-                {session?.user && (
+                {isAuthenticated && (
                   <button 
                     className="lg:hidden p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
                     onClick={() => {
@@ -574,8 +579,7 @@ export default function Navbar() {
                   </button>
                 )}
 
-                {/* Create Button with Dropdown - Only show when logged in */}
-                {session?.user && (
+                {isAuthenticated && (
                   <div className="relative">
                     <Button
                       onClick={() => setShowCreateMenu(!showCreateMenu)}
@@ -613,22 +617,23 @@ export default function Navbar() {
                   </div>
                 )}
 
-                {/* User Menu - Show different content based on auth status */}
                 <div className="relative">
-                  {session?.user ? (
+                  {isAuthenticated ? (
                     <button
                       onClick={() => setShowUserMenu(!showUserMenu)}
                       className="flex items-center gap-2 p-1 rounded-lg hover:bg-gray-100 transition-colors"
                     >
                       <div className="w-9 h-9 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white font-semibold">
-                        {session?.user?.image ? (
+                        {user?.image ? (
                           <img
-                            src={session.user.image}
+                            src={user.image}
                             alt="Profile"
                             className="w-full h-full rounded-full object-cover"
                           />
                         ) : (
-                          session?.user?.name?.charAt(0) || <FaUserCircle className="w-6 h-6" />
+                          user?.name?.charAt(0)?.toUpperCase() || 
+                          user?.email?.charAt(0)?.toUpperCase() || 
+                          <FaUserCircle className="w-6 h-6" />
                         )}
                       </div>
                       <FaChevronDown className={`w-3 h-3 text-gray-500 transition-transform ${showUserMenu ? 'rotate-180' : ''}`} />
@@ -641,16 +646,20 @@ export default function Navbar() {
                     </Link>
                   )}
 
-                  {/* User Dropdown Menu */}
-                  {showUserMenu && session?.user && (
+                  {showUserMenu && isAuthenticated && (
                     <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-2xl border border-gray-200 py-2 z-50 animate-in fade-in slide-in-from-top-2">
                       <div className="px-4 py-3 border-b border-gray-100">
                         <div className="font-semibold text-gray-900">
-                          {session?.user?.name || "User"}
+                          {user?.name || "User"}
                         </div>
                         <div className="text-sm text-gray-500 truncate">
-                          {session?.user?.email || "user@example.com"}
+                          {user?.email || "user@example.com"}
                         </div>
+                        {user?.provider && (
+                          <div className="text-xs text-gray-400 mt-1">
+                            Signed in with {user.provider}
+                          </div>
+                        )}
                       </div>
 
                       <Link
@@ -687,8 +696,7 @@ export default function Navbar() {
             )}
           </div>
 
-          {/* Mobile Navigation - Only show when logged in */}
-          {!showMobileSearch && session?.user && (
+          {!showMobileSearch && isAuthenticated && (
             <div className="md:hidden mt-4 pt-3 border-t border-gray-200">
               <div className="flex items-center justify-around">
                 {navItems.map((item) => (
@@ -722,7 +730,6 @@ export default function Navbar() {
           )}
         </div>
 
-        {/* Click outside to close dropdowns */}
         {(showUserMenu || showCreateMenu || showSearchResults) && !showMobileSearch && (
           <div 
             className="fixed inset-0 z-40"
