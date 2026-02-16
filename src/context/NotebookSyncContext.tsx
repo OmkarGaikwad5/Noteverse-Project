@@ -2,6 +2,7 @@
 'use client';
 
 import React, { createContext, useContext, useRef, useState, useCallback, useEffect } from 'react';
+import { useToast } from '@/hooks/useToast';
 
 interface NotebookSyncContextType {
     isSyncing: boolean;
@@ -17,6 +18,7 @@ export const useNotebookSync = () => useContext(NotebookSyncContext);
 
 export const NotebookSyncProvider: React.FC<{ children: React.ReactNode, userId: string }> = ({ children, userId }) => {
     const [isSyncing, setIsSyncing] = useState(false);
+    const toast = useToast();
 
     // Map of "notebookId-pageIndex" -> content
     const dirtyPagesRef = useRef<Map<string, { notebookId: string, pageIndex: number, content: any }>>(new Map());
@@ -44,16 +46,18 @@ export const NotebookSyncProvider: React.FC<{ children: React.ReactNode, userId:
                     });
                 } catch (err) {
                     console.error(`Failed to sync page ${page.pageIndex}`, err);
+                    toast.error({ title: "Page sync failed", description: `Page ${page.pageIndex + 1} will retry on next edit.` });
                     // Re-queue? simpler to just let next edit trigger it for now, 
                     // or ideally re-add to map if not present.
                 }
             }));
         } catch (e) {
             console.error("Sync batch failed", e);
+            toast.error({ title: "Notebook sync failed", description: "Please keep editing; sync will retry." });
         } finally {
             setIsSyncing(false);
         }
-    }, [isSyncing, userId]);
+    }, [isSyncing, userId, toast]);
 
     const registerPageChange = useCallback((notebookId: string, pageIndex: number, content: any) => {
         const key = `${notebookId}-${pageIndex}`;

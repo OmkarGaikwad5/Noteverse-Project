@@ -29,6 +29,7 @@ import {
 import { FiTrendingUp, FiSettings, FiUserCheck } from "react-icons/fi";
 import { IoStatsChart } from "react-icons/io5";
 import { TbDeviceDesktop, TbDeviceMobile } from "react-icons/tb";
+import { useToast } from "@/hooks/useToast";
 
 interface UserProfile {
   name: string;
@@ -62,6 +63,7 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState("overview");
+  const toast = useToast();
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -76,6 +78,7 @@ export default function ProfilePage() {
       } catch (err) {
         console.error(err);
         setError('Could not load profile data');
+        toast.error({ title: "Profile load failed", description: "Could not load profile data." });
       } finally {
         setLoading(false);
       }
@@ -86,10 +89,12 @@ export default function ProfilePage() {
     } else {
       setLoading(false);
     }
-  }, [session]);
+  }, [session, toast]);
 
   const handleLogout = async () => {
+    const toastId = toast.loading({ title: "Signing out...", description: "Ending your session." });
     await signOut({ callbackUrl: "/" });
+    toast.update(toastId, "success", { title: "Signed out", description: "You have been logged out." });
   };
 
   const calculateStoragePercentage = () => {

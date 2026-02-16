@@ -11,6 +11,7 @@ const CanvasPage = dynamic(() => import('./CanvasPage'), {
 import { Button } from '@/components/custom/button';
 import { FaChevronLeft, FaChevronRight, FaPlus } from 'react-icons/fa';
 import { NotebookSyncProvider, useNotebookSync } from '@/context/NotebookSyncContext';
+import { useToast } from '@/hooks/useToast';
 
 interface NotebookViewerProps {
     notebookId: string;
@@ -21,6 +22,7 @@ function NotebookViewerContent({ notebookId }: NotebookViewerProps) {
     const [pageData, setPageData] = useState<PageContent | null>(null);
     const [loading, setLoading] = useState(true);
     const { registerPageChange, isSyncing } = useNotebookSync();
+    const toast = useToast();
 
     // Fetch Page Data
     useEffect(() => {
@@ -36,16 +38,18 @@ function NotebookViewerContent({ notebookId }: NotebookViewerProps) {
                 }
             } catch (e) {
                 console.error(e);
+                toast.error({ title: "Page load failed", description: "Could not fetch page data." });
             } finally {
                 setLoading(false);
             }
         };
         fetchPage();
-    }, [notebookId, pageIndex]);
+    }, [notebookId, pageIndex, toast]);
 
     const handleAddPage = async () => {
         setPageIndex(prev => prev + 1);
         setPageData(null);
+        toast.success({ title: "New page added", description: `Switched to page ${pageIndex + 2}.` });
     };
 
     const handleSave = (data: PageContent) => {

@@ -2,6 +2,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { Button } from '@/components/custom/button';
+import { useToast } from '@/hooks/useToast';
 import { 
   FaChevronLeft, 
   FaChevronRight, 
@@ -83,10 +84,12 @@ export default function Notebook({ noteId }: { noteId: string }) {
 
   const lineInputRefs = useRef<(HTMLTextAreaElement | null)[]>([]);
   const fullTextRef = useRef<HTMLTextAreaElement>(null);
+  const didMountOnlineRef = useRef(false);
   const [history, setHistory] = useState<PageContent[][]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [selectedLineIndex, setSelectedLineIndex] = useState<number | null>(null);
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
+  const toast = useToast();
 
   // Font options
   const fonts = [
@@ -115,6 +118,19 @@ export default function Notebook({ noteId }: { noteId: string }) {
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
+
+  useEffect(() => {
+    if (!didMountOnlineRef.current) {
+      didMountOnlineRef.current = true;
+      return;
+    }
+
+    if (isOnline) {
+      toast.success({ title: "Back online", description: "Changes will sync automatically." });
+    } else {
+      toast.info({ title: "You are offline", description: "Changes are saved locally until reconnected." });
+    }
+  }, [isOnline, toast]);
 
   // History helper
   const pushHistory = useCallback(() => {
@@ -256,6 +272,7 @@ export default function Notebook({ noteId }: { noteId: string }) {
     const updatedPages = [...pages, newPage];
     setPages(updatedPages);
     setPageIndex(updatedPages.length - 1);
+    toast.success({ title: "Page added", description: `Moved to page ${updatedPages.length}.` });
   };
 
   const exportPage = () => {
@@ -269,12 +286,18 @@ export default function Notebook({ noteId }: { noteId: string }) {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    toast.success({ title: "Export complete", description: `Page ${pageIndex + 1} downloaded.` });
   };
 
   const copyToClipboard = () => {
     const content = pages[pageIndex]?.lines?.join('\n') || currentLines.join('\n');
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(content).catch(err => console.error('Failed to copy:', err));
+      navigator.clipboard.writeText(content)
+        .then(() => toast.success({ title: "Copied", description: "Page content copied to clipboard." }))
+        .catch(err => {
+          console.error('Failed to copy:', err);
+          toast.error({ title: "Copy failed", description: "Clipboard write failed." });
+        });
     } else {
       // Fallback for older browsers
       try {
@@ -286,8 +309,10 @@ export default function Notebook({ noteId }: { noteId: string }) {
         textarea.select();
         document.execCommand('copy');
         document.body.removeChild(textarea);
+        toast.success({ title: "Copied", description: "Page content copied to clipboard." });
       } catch (err) {
         console.error('Fallback copy failed:', err);
+        toast.error({ title: "Copy failed", description: "Clipboard is unavailable." });
       }
     }
   };
@@ -326,6 +351,7 @@ export default function Notebook({ noteId }: { noteId: string }) {
               }
             }
           }, 60);
+          toast.success({ title: "Image inserted", description: "Image added as a new line." });
         };
         reader.readAsDataURL(file);
       }
@@ -362,6 +388,7 @@ export default function Notebook({ noteId }: { noteId: string }) {
           }
         }
       }, 60);
+      toast.success({ title: "Link inserted", description: "Link added as a new line." });
     }
   };
 

@@ -2,9 +2,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/custom/button';
 import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/hooks/useToast';
 
 export default function SharingPanel({ noteId }: { noteId: string }) {
     const { user } = useAuth();
+    const toast = useToast();
     const [email, setEmail] = useState('');
     const [permission, setPermission] = useState<'view'|'edit'>('edit');
     type SharedEntry = {
@@ -46,8 +48,11 @@ export default function SharingPanel({ noteId }: { noteId: string }) {
             if (!res.ok) return;
             const data = await res.json();
             setList((data.sharedWith || []) as SharedEntry[]);
-        } catch (e) { console.error(e); }
-    }, [noteId]);
+        } catch (e) {
+            console.error(e);
+            toast.error({ title: "Failed to load sharing list", description: "Please try again." });
+        }
+    }, [noteId, toast]);
 
     const fetchInvites = useCallback(async () => {
         try {
@@ -55,8 +60,11 @@ export default function SharingPanel({ noteId }: { noteId: string }) {
             if (!res.ok) return;
             const data = await res.json();
             setInvites(data.invites || []);
-        } catch (e) { console.error(e); }
-    }, [noteId]);
+        } catch (e) {
+            console.error(e);
+            toast.error({ title: "Failed to load invites", description: "Please try again." });
+        }
+    }, [noteId, toast]);
 
     const fetchAudit = useCallback(async () => {
         try {
@@ -64,48 +72,85 @@ export default function SharingPanel({ noteId }: { noteId: string }) {
             if (!res.ok) return;
             const data = await res.json();
             setAudit(data.logs || []);
-        } catch (e) { console.error(e); }
-    }, [noteId]);
+        } catch (e) {
+            console.error(e);
+            toast.error({ title: "Failed to load activity", description: "Please try again." });
+        }
+    }, [noteId, toast]);
 
     useEffect(() => { fetchList(); }, [fetchList]);
     useEffect(() => { fetchInvites(); fetchAudit(); }, [fetchInvites, fetchAudit]);
 
     const handleShare = async () => {
-        if (!email) return;
+        if (!email) {
+            toast.info({ title: "Email required", description: "Enter an email to share with." });
+            return;
+        }
         setLoading(true);
-        await fetch(`/api/notes/${noteId}/share`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, permission }) });
-        setEmail('');
-        await fetchList();
-        await fetchAudit();
-        setLoading(false);
+        try {
+            const res = await fetch(`/api/notes/${noteId}/share`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, permission }) });
+            if (!res.ok) {
+                toast.error({ title: "Share failed", description: "Could not share this note." });
+                return;
+            }
+            setEmail('');
+            await fetchList();
+            await fetchAudit();
+            toast.success({ title: "Note shared", description: `Shared with ${email}.` });
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleUnshare = async (eMail: string) => {
         setLoading(true);
-        await fetch(`/api/notes/${noteId}/share`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: eMail }) });
-        await fetchList();
-        await fetchAudit();
-        setLoading(false);
+        try {
+            const res = await fetch(`/api/notes/${noteId}/share`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: eMail }) });
+            if (!res.ok) {
+                toast.error({ title: "Remove failed", description: "Could not remove collaborator." });
+                return;
+            }
+            await fetchList();
+            await fetchAudit();
+            toast.success({ title: "Access removed", description: `${eMail} no longer has access.` });
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleInvite = async () => {
-        if (!inviteEmail) return;
-        setLoading(true);
-        const res = await fetch(`/api/notes/${noteId}/invite`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: inviteEmail, permission, message: inviteMessage, createLink: true }) });
-        if (res.ok) {
-            const data = await res.json();
-            setShareLink(data.invite?.link || data.link || null);
-            setInviteEmail('');
-            setInviteMessage('');
-            await fetchInvites();
-            await fetchAudit();
+        if (!inviteEmail) {
+            toast.info({ title: "Email required", description: "Enter an email to send invite." });
+            return;
         }
-        setLoading(false);
+        setLoading(true);
+        try {
+            const res = await fetch(`/api/notes/${noteId}/invite`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: inviteEmail, permission, message: inviteMessage, createLink: true }) });
+            if (res.ok) {
+                const data = await res.json();
+                setShareLink(data.invite?.link || data.link || null);
+                setInviteEmail('');
+                setInviteMessage('');
+                await fetchInvites();
+                await fetchAudit();
+                toast.success({ title: "Invite sent", description: `Invitation sent to ${inviteEmail}.` });
+            } else {
+                toast.error({ title: "Invite failed", description: "Could not create invite." });
+            }
+        } finally {
+            setLoading(false);
+        }
     };
 
     const copyLink = async () => {
         if (!shareLink) return;
-        try { await navigator.clipboard.writeText(shareLink); } catch (e) { console.error(e); }
+        try {
+            await navigator.clipboard.writeText(shareLink);
+            toast.success({ title: "Link copied", description: "Share link copied to clipboard." });
+        } catch (e) {
+            console.error(e);
+            toast.error({ title: "Copy failed", description: "Could not copy invite link." });
+        }
     };
 
     return (

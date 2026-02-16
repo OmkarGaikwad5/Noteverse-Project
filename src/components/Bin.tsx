@@ -4,6 +4,7 @@ import { FiRotateCcw, FiTrash2 } from 'react-icons/fi';
 import { Dialog } from '@headlessui/react';
 import { FaArrowLeft } from 'react-icons/fa';
 import { useRouter } from 'next/navigation';
+import { useToast } from '@/hooks/useToast';
 
 type NoteType = 'canvas' | 'notebook';
 
@@ -21,6 +22,7 @@ const Bin: React.FC = () => {
     const [deletedNotes, setDeletedNotes] = useState<Note[]>([]);
     const [deleteTarget, setDeleteTarget] = useState<Note | null>(null);
     const navigate = useRouter();
+    const toast = useToast();
     useEffect(() => {
         const binData = localStorage.getItem(BIN_STORAGE_KEY);
         if (binData) setDeletedNotes(JSON.parse(binData));
@@ -37,14 +39,17 @@ const Bin: React.FC = () => {
         const existingNotes = JSON.parse(localStorage.getItem(NOTES_STORAGE_KEY) || '[]');
         const updatedNotes = [note, ...existingNotes];
         localStorage.setItem(NOTES_STORAGE_KEY, JSON.stringify(updatedNotes));
+        toast.success({ title: "Note restored", description: `"${note.title}" moved back to notes.` });
     };
 
     const handlePermanentDelete = () => {
         if (!deleteTarget) return;
+        const deletedTitle = deleteTarget.title;
         const updatedBin = deletedNotes.filter((n) => n.id !== deleteTarget.id);
         localStorage.setItem(BIN_STORAGE_KEY, JSON.stringify(updatedBin));
         setDeletedNotes(updatedBin);
         setDeleteTarget(null);
+        toast.success({ title: "Deleted permanently", description: `"${deletedTitle}" was removed.` });
     };
 
     return (

@@ -13,6 +13,7 @@ import {
   FaSortAmountDown, FaRegClock
 } from 'react-icons/fa';
 import { BsBrush, BsCardText, BsGrid3X3 } from 'react-icons/bs';
+import { useToast } from '@/hooks/useToast';
 
 interface Notebook {
   _id: string;
@@ -35,6 +36,7 @@ export default function NotebookGrid() {
   const [filteredNotebooks, setFilteredNotebooks] = useState<Notebook[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const toast = useToast();
 
   // UI States
   const [searchQuery, setSearchQuery] = useState('');
@@ -97,12 +99,13 @@ export default function NotebookGrid() {
         });
       } catch (e) {
         console.error("Failed to fetch notebooks", e);
+        toast.error({ title: "Failed to load notebooks", description: "Please refresh and try again." });
       } finally {
         setLoading(false);
       }
     };
     fetchNotebooks();
-  }, []);
+  }, [toast]);
 
   // Filter and sort notebooks
   useEffect(() => {
@@ -146,11 +149,17 @@ export default function NotebookGrid() {
   };
 
   const confirmCreate = async () => {
-    if (!newTitle.trim()) return;
+    if (!newTitle.trim()) {
+      toast.info({ title: "Title required", description: "Enter a notebook title to continue." });
+      return;
+    }
 
     try {
       const resAuth = await fetch('/api/auth/me');
-      if (!resAuth.ok) return;
+      if (!resAuth.ok) {
+        toast.error({ title: "Authentication required", description: "Please log in again." });
+        return;
+      }
       const userData = await resAuth.json();
 
       const res = await fetch('/api/v2/notebooks', {
@@ -179,9 +188,13 @@ export default function NotebookGrid() {
         setIsCreating(false);
         setNewTitle('');
         setNewDescription('');
+        toast.success({ title: "Notebook created", description: "Your notebook is ready." });
+      } else {
+        toast.error({ title: "Create failed", description: "Could not create notebook." });
       }
     } catch (e) {
       console.error(e);
+      toast.error({ title: "Create failed", description: "Please try again." });
     }
   };
 
@@ -202,9 +215,13 @@ export default function NotebookGrid() {
         
         if (res.ok) {
           setNotebooks(notebooks.filter(nb => nb._id !== id));
+          toast.success({ title: "Notebook deleted", description: "The notebook was removed." });
+        } else {
+          toast.error({ title: "Delete failed", description: "Could not delete notebook." });
         }
       } catch (e) {
         console.error('Failed to delete notebook', e);
+        toast.error({ title: "Delete failed", description: "Please try again." });
       }
     }
   };

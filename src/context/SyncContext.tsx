@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
 import { storage } from '@/lib/storage';
 import { useAuth } from './AuthContext';
+import { useToast } from '@/hooks/useToast';
 
 interface SyncContextType {
     isSyncing: boolean;
@@ -24,6 +25,7 @@ export const useSync = () => useContext(SyncContext);
 export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
     const { user, loading } = useAuth();   // 🔥 SINGLE SOURCE OF TRUTH
+    const toast = useToast();
     const userId = user?.id ?? null;
 
     const [isSyncing, setIsSyncing] = useState(false);
@@ -52,8 +54,9 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         } catch (e) {
             console.error("Pull sync failed", e);
+            toast.error({ title: "Sync pull failed", description: "Could not fetch latest updates." });
         }
-    }, [userId]);
+    }, [userId, toast]);
 
     /* ------------------ PUSH TO SERVER ------------------ */
     const processQueue = useCallback(async () => {
@@ -102,6 +105,7 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } catch (e) {
             console.error("Sync failed, restoring queue", e);
             ids.forEach(id => dirtyNotesRef.current.add(id));
+            toast.error({ title: "Sync failed", description: "Changes queued and will retry automatically." });
         } finally {
             setIsSyncing(false);
             // After pushing changes, attempt to pull remote updates to improve collaboration latency
@@ -112,7 +116,7 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
         }
 
-    }, [userId, isSyncing]);
+    }, [userId, isSyncing, pullUpdates, toast]);
 
     /* ------------------ REGISTER CHANGE ------------------ */
     const registerChange = useCallback((noteId: string) => {
