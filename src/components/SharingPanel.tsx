@@ -14,6 +14,30 @@ export default function SharingPanel({ noteId }: { noteId: string }) {
     };
 
     const [list, setList] = useState<SharedEntry[]>([]);
+    type InviteEntry = {
+        token: string;
+        noteId: string;
+        inviterId?: string;
+        email: string;
+        permission: 'view' | 'edit';
+        message?: string;
+        accepted?: boolean;
+        acceptedBy?: string;
+        createdAt: string;
+    };
+    const [invites, setInvites] = useState<InviteEntry[]>([]);
+    const [inviteEmail, setInviteEmail] = useState('');
+    const [inviteMessage, setInviteMessage] = useState('');
+    const [shareLink, setShareLink] = useState<string | null>(null);
+    type AuditEntry = {
+        _id?: string;
+        noteId?: string;
+        action: string;
+        userId?: string;
+        details?: Record<string, unknown> | null;
+        createdAt: string;
+    };
+    const [audit, setAudit] = useState<AuditEntry[]>([]);
     const [loading, setLoading] = useState(false);
 
     const fetchList = useCallback(async () => {
@@ -25,7 +49,26 @@ export default function SharingPanel({ noteId }: { noteId: string }) {
         } catch (e) { console.error(e); }
     }, [noteId]);
 
+    const fetchInvites = useCallback(async () => {
+        try {
+            const res = await fetch(`/api/notes/${noteId}/invite`);
+            if (!res.ok) return;
+            const data = await res.json();
+            setInvites(data.invites || []);
+        } catch (e) { console.error(e); }
+    }, [noteId]);
+
+    const fetchAudit = useCallback(async () => {
+        try {
+            const res = await fetch(`/api/notes/${noteId}/audit`);
+            if (!res.ok) return;
+            const data = await res.json();
+            setAudit(data.logs || []);
+        } catch (e) { console.error(e); }
+    }, [noteId]);
+
     useEffect(() => { fetchList(); }, [fetchList]);
+    useEffect(() => { fetchInvites(); fetchAudit(); }, [fetchInvites, fetchAudit]);
 
     const handleShare = async () => {
         if (!email) return;
@@ -33,6 +76,7 @@ export default function SharingPanel({ noteId }: { noteId: string }) {
         await fetch(`/api/notes/${noteId}/share`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, permission }) });
         setEmail('');
         await fetchList();
+        await fetchAudit();
         setLoading(false);
     };
 
@@ -40,7 +84,28 @@ export default function SharingPanel({ noteId }: { noteId: string }) {
         setLoading(true);
         await fetch(`/api/notes/${noteId}/share`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: eMail }) });
         await fetchList();
+        await fetchAudit();
         setLoading(false);
+    };
+
+    const handleInvite = async () => {
+        if (!inviteEmail) return;
+        setLoading(true);
+        const res = await fetch(`/api/notes/${noteId}/invite`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: inviteEmail, permission, message: inviteMessage, createLink: true }) });
+        if (res.ok) {
+            const data = await res.json();
+            setShareLink(data.invite?.link || data.link || null);
+            setInviteEmail('');
+            setInviteMessage('');
+            await fetchInvites();
+            await fetchAudit();
+        }
+        setLoading(false);
+    };
+
+    const copyLink = async () => {
+        if (!shareLink) return;
+        try { await navigator.clipboard.writeText(shareLink); } catch (e) { console.error(e); }
     };
 
     return (
@@ -53,6 +118,20 @@ export default function SharingPanel({ noteId }: { noteId: string }) {
                     <option value="edit">Edit</option>
                 </select>
                 <Button onClick={handleShare} variant="primary" className="px-3">{loading ? '...' : 'Share'}</Button>
+            </div>
+            <div className="mt-3 border-t pt-3">
+                <h5 className="text-sm mb-1">Invite by email / Share link</h5>
+                <div className="flex gap-2">
+                    <input value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} placeholder="Invitee email" className="flex-1 input" />
+                    <Button onClick={handleInvite} variant="secondary" className="px-3">{loading ? '...' : 'Invite'}</Button>
+                </div>
+                <textarea value={inviteMessage} onChange={e => setInviteMessage(e.target.value)} placeholder="Optional message" className="mt-2 input h-20" />
+                {shareLink && (
+                    <div className="mt-2 flex items-center gap-2">
+                        <input readOnly value={shareLink} className="flex-1 input" />
+                        <Button onClick={copyLink} variant="ghost">Copy</Button>
+                    </div>
+                )}
             </div>
             <div className="mt-3">
                 <h5 className="text-sm mb-1">Shared With</h5>
@@ -67,6 +146,38 @@ export default function SharingPanel({ noteId }: { noteId: string }) {
                     ))}
                 </ul>
             </div>
+            <div className="mt-3 border-t pt-3">
+                <h5 className="text-sm mb-1">Pending Invites</h5>
+                <ul className="space-y-1">
+                    {invites.map((inv: InviteEntry) => (
+                        <li key={inv.token} className="flex justify-between items-center text-sm">
+                            <div>
+                                <div className="font-medium">{inv.email}</div>
+                                <div className="text-xs text-muted">{inv.permission} • {new Date(inv.createdAt).toLocaleString()}</div>
+                            </div>
+                            <div>
+                                <a href={inviteLink(inv.token)} target="_blank" rel="noreferrer" className="text-sm text-indigo-600 hover:underline">Open</a>
+                            </div>
+                        </li>
+                    ))}
+                </ul>
+            </div>
+            <div className="mt-3 border-t pt-3">
+                <h5 className="text-sm mb-1">Activity</h5>
+                <ul className="space-y-1 text-xs text-gray-600 max-h-48 overflow-auto">
+                    {audit.map((a: AuditEntry) => (
+                        <li key={String(a._id)}>
+                            <div className="font-medium">{a.action}</div>
+                            <div className="text-xs">{a.details ? JSON.stringify(a.details) : ''} • {new Date(a.createdAt).toLocaleString()}</div>
+                        </li>
+                    ))}
+                </ul>
+            </div>
         </div>
     );
+}
+
+function inviteLink(token: string) {
+    const base = typeof window !== 'undefined' ? window.location.origin : (process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || '');
+    return `${base}/api/invite/${token}`;
 }

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import Note from '@/models/Note';
 import User from '@/models/User';
+import AuditLog from '@/models/AuditLog';
 import { getServerSession } from 'next-auth';
 import type { Session } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -41,6 +42,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             note.sharedWith = (note.sharedWith || []).map((s: any) => String(s.userId) === String(userToShare._id) ? { ...s.toObject ? s.toObject() : s, permission } : s);
             await note.save();
         }
+
+        await AuditLog.create({ noteId: note._id, action: 'shared', userId: dbUser._id, details: { sharedWith: userToShare._id, permission } });
 
         return NextResponse.json({ status: 'shared' });
 
@@ -101,6 +104,8 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
 
         note.sharedWith = (note.sharedWith || []).filter((s: any) => String(s.userId) !== String(userToRemove._id));
         await note.save();
+
+        await AuditLog.create({ noteId: note._id, action: 'unshared', userId: dbUser._id, details: { removed: userToRemove._id } });
 
         return NextResponse.json({ status: 'unshared' });
     } catch (e) {
