@@ -28,10 +28,17 @@ export async function GET(req: Request) {
     const since = searchParams.get('since');
     const sinceDate = since ? new Date(since) : new Date(0);
 
-    // 4️⃣ Fetch notes safely
+    // 4️⃣ Fetch notes safely — include notes shared with this user
     const notes = await Note.find({
-      userId: dbUser._id,
-      updatedAt: { $gt: sinceDate }
+      $and: [
+        { updatedAt: { $gt: sinceDate } },
+        {
+          $or: [
+            { userId: dbUser._id },
+            { 'sharedWith.userId': dbUser._id }
+          ]
+        }
+      ]
     }).lean();
 
     return NextResponse.json({
