@@ -104,6 +104,12 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
             ids.forEach(id => dirtyNotesRef.current.add(id));
         } finally {
             setIsSyncing(false);
+            // After pushing changes, attempt to pull remote updates to improve collaboration latency
+            try {
+                await pullUpdates();
+            } catch (e) {
+                // ignore
+            }
         }
 
     }, [userId, isSyncing]);

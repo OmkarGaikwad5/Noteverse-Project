@@ -7,8 +7,8 @@ import jwt from 'jsonwebtoken';
 import dbConnect from '@/lib/db';
 import Notebook from '@/models/Notebook';
 
-export default async function Page({ params }: { params: { notebookId: string } }) {
-    const { notebookId } = params;
+export default async function Page({ params }: { params: Promise<{ notebookId: string }> }) {
+    const { notebookId } = await params;
 
     // Get User ID from Token
     const cookieStore = await cookies();

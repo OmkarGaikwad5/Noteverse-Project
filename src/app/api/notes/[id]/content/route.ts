@@ -4,6 +4,10 @@ import dbConnect from '@/lib/db';
 import NotebookContent from '@/models/NotebookContent';
 import CanvasContent from '@/models/CanvasContent';
 import Note from '@/models/Note';
+import User from '@/models/User';
+import { getServerSession } from 'next-auth';
+import type { Session } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
     await dbConnect();
@@ -11,16 +15,33 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     try {
         const body = await req.json();
-        const { type, data, updatedAt, userId } = body;
+        const { type, data, updatedAt } = body;
 
-        if (!id || !type || !data || !userId) {
+        if (!id || !type || !data) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
         }
 
-        // Verify ownership
-        const note = await Note.findOne({ _id: id, userId });
+        // Authenticate via next-auth session
+        const session = await getServerSession(authOptions as any) as Session | null;
+        if (!session?.user?.email) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        const dbUser = await User.findOne({ email: session.user.email });
+        if (!dbUser) return NextResponse.json({ error: 'User not found' }, { status: 404 });
+
+        // Verify ownership or edit permission for collaborators
+        const note = await Note.findOne({ _id: id });
         if (!note) {
-            return NextResponse.json({ error: 'Note not found or unauthorized' }, { status: 404 });
+            return NextResponse.json({ error: 'Note not found' }, { status: 404 });
+        }
+
+        const isOwner = String(note.userId) === String(dbUser._id);
+        const collaborator = (note.sharedWith || []).find((s: any) => String(s.userId) === String(dbUser._id));
+        const hasEditPermission = isOwner || (collaborator && collaborator.permission === 'edit');
+
+        if (!hasEditPermission) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
         }
 
         const clientUpdatedAt = new Date(updatedAt);

@@ -421,6 +421,7 @@ export default function NotebookGrid() {
                       <button
                         onClick={(e) => handleStarClick(notebook._id, e)}
                         className="p-1.5 text-gray-400 hover:text-yellow-500 hover:bg-yellow-50 rounded-lg transition-colors"
+                        type="button"
                       >
                         {notebook.isStarred ? (
                           <FiStar className="w-4 h-4 text-yellow-500 fill-yellow-500" />
@@ -428,7 +429,18 @@ export default function NotebookGrid() {
                           <FiStar className="w-4 h-4" />
                         )}
                       </button>
-                      <button className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteClick(notebook._id, e);
+                        }}
+                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Delete Notebook"
+                      >
+                        <FiTrash2 className="w-4 h-4" />
+                      </button>
+                      <button className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors" type="button">
                         <FiMoreVertical className="w-4 h-4" />
                       </button>
                     </div>

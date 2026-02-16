@@ -2,6 +2,7 @@
 import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import Note from '@/models/Note';
+import User from '@/models/User';
 
 export async function POST(req: Request) {
     await dbConnect();
@@ -11,6 +12,17 @@ export async function POST(req: Request) {
 
         if (!userId || !Array.isArray(notes)) {
             return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
+        }
+
+        // Resolve userId: allow client to send either a Mongo ObjectId string or an email.
+        let resolvedUserId: any = userId;
+        // crude email check
+        if (typeof userId === 'string' && userId.includes('@')) {
+            const dbUser = await User.findOne({ email: userId });
+            if (!dbUser) {
+                return NextResponse.json({ error: 'User not found for provided identifier' }, { status: 400 });
+            }
+            resolvedUserId = dbUser._id;
         }
 
         const updatedIds: string[] = [];
@@ -31,47 +43,12 @@ export async function POST(req: Request) {
             // However, blindly overwriting might be dangerous if multiple devices sync out of order.
             // Ideally: Update if (db.updatedAt < client.updatedAt) OR (doc not found).
 
-            // MongoDB query for this:
-            const result = await Note.updateOne(
-                {
-                    _id: noteId,
-                    userId: userId,
-                    // Only update if current doc is OLDER, or doesn't exist (handled by upsert behaviors slightly differently, need careful query)
-                    // Actually, for bulk sync, simple approach:
-                    // Try to find. If found and newer => skip. Else => update/insert.
-                },
-                {
-                    $set: {
-                        title: note.title,
-                        type: note.type,
-                        isDeleted: note.isDeleted || false,
-                        updatedAt: clientUpdatedAt,
-                        serverUpdatedAt: new Date()
-                    },
-                    $setOnInsert: {
-                        createdAt: new Date(note.createdAt || Date.now())
-                    }
-                },
-                { upsert: true }
-            );
-
-            // Technically updateOne with upsert will insert if not found. 
-            // But how do we enforce "only if newer"?
-            // We can add a query condition: updatedAt: { $lt: clientUpdatedAt }
-            // BUT if it doesn't exist, that condition won't match, so it won't insert? 
-            // No, with upsert, if query doesn't match, it inserts.
-            // But if it exists and ensures {updatedAt: {$lt: ...}}, and it FAILS (because server is newer), it DOES NOT Insert.
-            // So:
-            // Query: { _id: noteId, userId: userId, $or: [ { updatedAt: { $lt: clientUpdatedAt } }, { updatedAt: { $exists: false } } ] }
-            // But `upsert` creates a NEW doc if query fails. If doc exists but is NEWER, we don't want to create new doc, we want to DO NOTHING.
-            // So upsert is tricky here.
-
-            // Better approach for clarity:
-            const existing = await Note.findOne({ _id: noteId, userId });
+            // Better approach for clarity: find existing by resolved user id
+            const existing = await Note.findOne({ _id: noteId, userId: resolvedUserId });
 
             if (!existing || new Date(existing.updatedAt) < clientUpdatedAt) {
                 await Note.updateOne(
-                    { _id: noteId, userId },
+                    { _id: noteId, userId: resolvedUserId },
                     {
                         title: note.title,
                         type: note.type,

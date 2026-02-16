@@ -199,10 +199,23 @@ const NoteSelector: React.FC = () => {
                                                 </div>
                                                 
                                                 {/* Options Menu */}
-                                                <div className="relative">
+                                                <div className="relative flex items-center gap-2">
                                                     <button
+                                                        type="button"
                                                         onClick={(e) => {
                                                             e.stopPropagation();
+                                                            handleDelete(note.id);
+                                                        }}
+                                                        className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                        title="Move to Bin"
+                                                    >
+                                                        <FiTrash2 className="text-sm sm:text-base" />
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            e.preventDefault();
                                                             setShowMenuId(showMenuId === note.id ? null : note.id);
                                                         }}
                                                         className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
@@ -211,8 +224,12 @@ const NoteSelector: React.FC = () => {
                                                     </button>
                                                     
                                                     {showMenuId === note.id && (
-                                                        <div className="absolute right-0 top-full mt-1 w-40 sm:w-48 bg-white rounded-lg shadow-xl border border-gray-200 z-10 animate-in fade-in slide-in-from-top-2 duration-200">
+                                                        <div
+                                                            onClick={(e) => e.stopPropagation()}
+                                                            className="absolute right-0 top-full mt-1 w-40 sm:w-48 bg-white rounded-lg shadow-xl border border-gray-200 z-10 animate-in fade-in slide-in-from-top-2 duration-200"
+                                                        >
                                                             <button
+                                                                type="button"
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
                                                                     setEditingId(note.id);
@@ -225,6 +242,7 @@ const NoteSelector: React.FC = () => {
                                                                 Rename
                                                             </button>
                                                             <button
+                                                                type="button"
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
                                                                     handleDelete(note.id);
