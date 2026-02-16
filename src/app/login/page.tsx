@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { Button } from "@/components/custom/button";
+import { useToast } from "@/hooks/useToast";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -12,6 +13,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const toast = useToast();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,9 +33,11 @@ export default function LoginPage() {
         throw new Error(data.message || "Login failed");
       }
 
+      toast.success({ title: "Login successful", description: "Redirecting to your workspace." });
       router.push("/home");
     } catch (err: any) {
       setError(err.message);
+      toast.error({ title: "Login failed", description: err.message || "Please try again." });
     } finally {
       setIsLoading(false);
     }
@@ -74,7 +78,10 @@ export default function LoginPage() {
             {/* Social Login Buttons */}
             <div className="space-y-4 mb-8">
               <button
-                onClick={() => signIn("google", { callbackUrl: "/home" })}
+                onClick={() => {
+                  toast.info({ title: "Redirecting to Google", description: "Continue login in the provider window." });
+                  signIn("google", { callbackUrl: "/home" });
+                }}
                 className="w-full flex items-center justify-center gap-3 bg-white text-gray-800 px-6 py-3 rounded-xl font-medium border border-gray-300 hover:bg-gray-50 hover:shadow-md transition-all duration-300 hover:scale-[1.02] group"
               >
                 <div className="w-6 h-6 flex items-center justify-center">
@@ -89,7 +96,10 @@ export default function LoginPage() {
               </button>
 
               <button
-                onClick={() => signIn("github", { callbackUrl: "/home" })}
+                onClick={() => {
+                  toast.info({ title: "Redirecting to GitHub", description: "Continue login in the provider window." });
+                  signIn("github", { callbackUrl: "/home" });
+                }}
                 className="w-full flex items-center justify-center gap-3 bg-gray-900 text-white px-6 py-3 rounded-xl font-medium hover:bg-gray-800 hover:shadow-md transition-all duration-300 hover:scale-[1.02] group"
               >
                 <div className="w-6 h-6 flex items-center justify-center">

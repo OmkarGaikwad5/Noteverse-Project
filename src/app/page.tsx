@@ -30,12 +30,14 @@ import { MdOutlineDesignServices, MdOutlineSpeed } from "react-icons/md";
 import { useEffect, useState, useRef } from "react";
 import { useAuth } from '@/context/AuthContext';
 import { motion, useInView, AnimatePresence } from "framer-motion";
+import { useToast } from "@/hooks/useToast";
 
 export default function Home() {
   const [scrollY, setScrollY] = useState(0);
   const [hoveredFeature, setHoveredFeature] = useState<number | null>(null);
   const [activeTestimonial, setActiveTestimonial] = useState(0);
   const { user, loading, logout } = useAuth();
+  const toast = useToast();
   
   const heroRef = useRef(null);
   const featuresRef = useRef(null);
@@ -168,6 +170,16 @@ export default function Home() {
     return 'U';
   };
 
+  const handleLogout = async () => {
+    const toastId = toast.loading({ title: "Signing out...", description: "Ending your session." });
+    try {
+      await logout();
+      toast.update(toastId, "success", { title: "Signed out", description: "You have been logged out." });
+    } catch {
+      toast.update(toastId, "error", { title: "Logout failed", description: "Please try again." });
+    }
+  };
+
   return (
     <main className="min-h-screen bg-gradient-to-b from-gray-50 via-white to-gray-50 text-gray-900 overflow-hidden">
       {/* Modern Animated Background */}
@@ -264,7 +276,7 @@ export default function Home() {
                   <motion.button 
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                    onClick={logout} 
+                    onClick={handleLogout} 
                     className="inline-flex items-center px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-white border border-gray-200 hover:bg-red-50 text-red-600 font-medium text-xs sm:text-sm shadow-sm transition-all"
                   >
                     <span className="hidden sm:inline">Logout</span>

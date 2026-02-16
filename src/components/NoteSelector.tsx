@@ -8,6 +8,7 @@ import { BsBrush } from "react-icons/bs";
 import BinButton from "./custom/BinButton";
 import { usePersistentState } from "@/hooks/usePersistentState";
 import { useSync } from "@/context/SyncContext";
+import { useToast } from "@/hooks/useToast";
 
 type NoteType = "canvas" | "notebook";
 
@@ -33,6 +34,7 @@ const NoteSelector: React.FC = () => {
     const [editedTitle, setEditedTitle] = useState("");
     const [isDeleting, setIsDeleting] = useState<boolean>(false);
     const [showMenuId, setShowMenuId] = useState<string | null>(null);
+    const toast = useToast();
 
     const { registerChange } = useSync();
 
@@ -44,6 +46,7 @@ const NoteSelector: React.FC = () => {
         setEditingId(null);
         setShowMenuId(null);
         registerChange(id);
+        toast.success({ title: "Note renamed", description: "Title updated successfully." });
     };
 
     const handleDelete = (id: string) => {
@@ -60,6 +63,7 @@ const NoteSelector: React.FC = () => {
 
         registerChange(id);
         setShowMenuId(null);
+        toast.success({ title: "Moved to bin", description: "You can restore it anytime from Bin." });
 
         setTimeout(() => {
             setIsDeleting(false);
@@ -67,7 +71,10 @@ const NoteSelector: React.FC = () => {
     };
 
     const createNote = () => {
-        if (!selectedNoteType || !newNoteTitle.trim()) return;
+        if (!selectedNoteType || !newNoteTitle.trim()) {
+            toast.info({ title: "Title required", description: "Enter a note title to continue." });
+            return;
+        }
         
         setIsCreating(true);
         
@@ -87,6 +94,7 @@ const NoteSelector: React.FC = () => {
             setNewNoteTitle("");
             setIsCreating(false);
             registerChange(newNote.id);
+            toast.success({ title: "Note created", description: "Opening your new note." });
             
             // Navigate to the new note after a brief delay
             setTimeout(() => {
