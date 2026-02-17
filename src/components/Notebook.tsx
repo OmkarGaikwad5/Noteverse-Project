@@ -2,6 +2,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { Button } from '@/components/custom/button';
+import { useSession } from "next-auth/react";
 import { 
   FaChevronLeft, 
   FaChevronRight, 
@@ -71,6 +72,43 @@ export default function Notebook({ noteId }: { noteId: string }) {
     headingLevel: 0
   });
 
+  const { data: session } = useSession();
+
+  const saveToServer = React.useRef<NodeJS.Timeout | null>(null);
+
+const syncToServer = (newPages: PageContent[]) => {
+  if (!session?.user?.id) return;
+
+  if (saveToServer.current) clearTimeout(saveToServer.current);
+
+  saveToServer.current = setTimeout(async () => {
+    try {
+
+      const text = newPages.flatMap(p => p.lines).join("\n");
+
+      await fetch(`/api/notes/${noteId}/content`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "notebook",
+          userId: session.user.id,
+          updatedAt: new Date().toISOString(),
+          data: {
+            ops: [{ insert: text || "\n" }]   // ⭐ CRITICAL FIX
+          }
+        })
+      });
+
+      console.log("SYNC SUCCESS");
+
+    } catch (err) {
+      console.error("SYNC FAILED", err);
+    }
+  }, 700);
+};
+
+
+
   // Using usePersistentState for auto-sync and persistence
   const [pages, setPages] = usePersistentState<PageContent[]>(storageKey, [{
     id: Date.now().toString(),
@@ -81,6 +119,50 @@ export default function Notebook({ noteId }: { noteId: string }) {
     updatedAt: new Date().toISOString()
   }], noteId);
 
+  const [loadingFromServer, setLoadingFromServer] = useState(true);
+
+
+/* ---------------- LOAD NOTE CONTENT FROM DATABASE ---------------- */
+useEffect(() => {
+  if (!noteId || hasLoadedFromServer.current) return;
+
+  const loadFromServer = async () => {
+    try {
+      const res = await fetch(`/api/notes/${noteId}/content`);
+      const json = await res.json();
+
+      console.log("LOADED FROM API:", json);
+
+      if (json?.type === "notebook" && json?.data?.ops) {
+
+        const text = json.data.ops.map((op:any)=>op.insert || "").join("");
+        const lines = text.split("\n");
+
+        const newPage: PageContent = {
+          id: Date.now().toString(),
+          lines: lines.length ? lines : [""],
+          format: lines.map(()=>({...textFormat})),
+          version: 1,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+
+        setPages([newPage]);
+        hasLoadedFromServer.current = true;   // 🚀 IMPORTANT
+      }
+
+    } catch (e) {
+      console.error("LOAD NOTE FAILED", e);
+    } finally {
+      setLoadingFromServer(false);
+    }
+  };
+
+  loadFromServer();
+}, [noteId]);
+
+
+  const hasLoadedFromServer = useRef(false);
   const lineInputRefs = useRef<(HTMLTextAreaElement | null)[]>([]);
   const fullTextRef = useRef<HTMLTextAreaElement>(null);
   const [history, setHistory] = useState<PageContent[][]>([]);
@@ -98,7 +180,10 @@ export default function Notebook({ noteId }: { noteId: string }) {
     { name: 'Verdana', value: 'Verdana, sans-serif' }
   ];
 
-  const currentPage = pages[pageIndex] || { lines: [''], format: [textFormat] };
+
+
+const currentPage = pages[pageIndex] || { lines: [''], format: [textFormat] };
+
   const currentLines = currentPage.lines || [''];
   const currentFormats = currentPage.format || [textFormat];
 
@@ -162,6 +247,8 @@ export default function Notebook({ noteId }: { noteId: string }) {
     };
     
     setPages(updatedPages);
+    syncToServer(updatedPages);
+
     setTextFormat(prev => ({ ...prev, ...format }));
   };
 
@@ -193,6 +280,8 @@ export default function Notebook({ noteId }: { noteId: string }) {
     };
     
     setPages(updatedPages);
+    syncToServer(updatedPages);
+
   };
 
   const addLine = () => {
@@ -210,6 +299,8 @@ export default function Notebook({ noteId }: { noteId: string }) {
     };
     
     setPages(updatedPages);
+    syncToServer(updatedPages);
+
     
     setTimeout(() => {
       const lastRef = lineInputRefs.current[updatedLines.length - 1];
@@ -239,6 +330,7 @@ export default function Notebook({ noteId }: { noteId: string }) {
     };
     
     setPages(updatedPages);
+    syncToServer(updatedPages);
     setSelectedLineIndex(null);
   };
 
@@ -255,6 +347,7 @@ export default function Notebook({ noteId }: { noteId: string }) {
     
     const updatedPages = [...pages, newPage];
     setPages(updatedPages);
+    syncToServer(updatedPages);
     setPageIndex(updatedPages.length - 1);
   };
 
@@ -441,6 +534,7 @@ export default function Notebook({ noteId }: { noteId: string }) {
       };
       
       setPages(updatedPages);
+      syncToServer(updatedPages);
     };
 
     const fullTextStyle: React.CSSProperties = {
@@ -481,7 +575,14 @@ export default function Notebook({ noteId }: { noteId: string }) {
   }, []);
 
   return (
-    <div className={`h-screen ${fullscreen ? 'p-0' : 'p-4'} bg-gradient-to-br from-gray-50 to-blue-50`}>
+   <>
+    {loadingFromServer ? (
+      <div className="h-screen flex items-center justify-center text-gray-500 text-lg">
+        Loading note from database...
+      </div>
+    ) : (
+      <div className={`h-screen ${fullscreen ? 'p-0' : 'p-4'} bg-gradient-to-br from-gray-50 to-blue-50`}>
+
       <div className={`${fullscreen ? 'h-screen rounded-none' : 'h-full rounded-2xl shadow-2xl'} bg-white border border-gray-200 overflow-hidden flex flex-col`}>
         
         {/* Top Toolbar */}
@@ -855,6 +956,8 @@ export default function Notebook({ noteId }: { noteId: string }) {
           </div>
         </div>
       </div>
-    </div>
-  );
+      </div>
+    )}
+  </>
+);
 }

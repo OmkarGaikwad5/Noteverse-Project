@@ -8,56 +8,85 @@ import { useRouter } from 'next/navigation';
 type NoteType = 'canvas' | 'notebook';
 
 interface Note {
-    id: string;
+    _id: string;
     title: string;
     type: NoteType;
     createdAt: string;
 }
 
-const BIN_STORAGE_KEY = 'noteverse-bin';
-const NOTES_STORAGE_KEY = 'noteverse-notes';
-
 const Bin: React.FC = () => {
     const [deletedNotes, setDeletedNotes] = useState<Note[]>([]);
     const [deleteTarget, setDeleteTarget] = useState<Note | null>(null);
+    const [loading, setLoading] = useState(true);
     const navigate = useRouter();
+
+    /* ================= LOAD BIN FROM DATABASE ================= */
+    const loadBin = async () => {
+        try {
+            const res = await fetch('/api/notes/bin', { cache: 'no-store' });
+            const data = await res.json();
+
+            console.log("BIN NOTES FROM DB:", data);
+
+            setDeletedNotes(data.notes || []);
+        } catch (err) {
+            console.error("Failed to load bin:", err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     useEffect(() => {
-        const binData = localStorage.getItem(BIN_STORAGE_KEY);
-        if (binData) setDeletedNotes(JSON.parse(binData));
+        loadBin();
     }, []);
 
-    const handleRestore = (id: string) => {
-        const note = deletedNotes.find((n) => n.id === id);
-        if (!note) return;
+    /* ================= RESTORE NOTE ================= */
+    const handleRestore = async (id: string) => {
+        try {
+            await fetch(`/api/notes/${id}/restore`, {
+                method: 'PUT'
+            });
 
-        const updatedBin = deletedNotes.filter((n) => n.id !== id);
-        localStorage.setItem(BIN_STORAGE_KEY, JSON.stringify(updatedBin));
-        setDeletedNotes(updatedBin);
-
-        const existingNotes = JSON.parse(localStorage.getItem(NOTES_STORAGE_KEY) || '[]');
-        const updatedNotes = [note, ...existingNotes];
-        localStorage.setItem(NOTES_STORAGE_KEY, JSON.stringify(updatedNotes));
+            await loadBin();
+        } catch (err) {
+            console.error("Restore failed:", err);
+        }
     };
 
-    const handlePermanentDelete = () => {
+    /* ================= PERMANENT DELETE ================= */
+    const handlePermanentDelete = async () => {
         if (!deleteTarget) return;
-        const updatedBin = deletedNotes.filter((n) => n.id !== deleteTarget.id);
-        localStorage.setItem(BIN_STORAGE_KEY, JSON.stringify(updatedBin));
-        setDeletedNotes(updatedBin);
-        setDeleteTarget(null);
+
+        try {
+            await fetch(`/api/notes/${deleteTarget._id}/permanent`, {
+                method: 'DELETE'
+            });
+
+            setDeleteTarget(null);
+            await loadBin();
+        } catch (err) {
+            console.error("Permanent delete failed:", err);
+        }
     };
+
+    /* ================= LOADING ================= */
+    if (loading) {
+        return (
+            <div className="h-screen flex items-center justify-center text-gray-500 text-lg">
+                Loading Bin...
+            </div>
+        );
+    }
 
     return (
         <div className="p-6 md:p-10 min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
             <div className="flex items-center justify-between mb-8">
                 <div onClick={() => navigate.push('/home')} className='flex cursor-pointer items-center gap-5'>
-                    <span className=''>
+                    <span>
                         <FaArrowLeft size={20} />
                     </span>
                     <h1 className="text-3xl flex gap-2 items-center font-bold text-slate-800">
-                        <span>
-                            <FiTrash2 size={26} />
-                        </span>
+                        <FiTrash2 size={26} />
                         Bin
                     </h1>
                 </div>
@@ -76,7 +105,7 @@ const Bin: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {deletedNotes.map((note) => (
                         <div
-                            key={note.id}
+                            key={note._id}
                             className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm hover:shadow-md transition duration-300"
                         >
                             <div className="mb-2">
@@ -84,11 +113,11 @@ const Bin: React.FC = () => {
                                 <p className="text-sm text-gray-500 capitalize">{note.type}</p>
                             </div>
                             <p className="text-xs text-gray-400 mb-4">
-                                Deleted on {new Date(note.createdAt).toLocaleString()}
+                                Deleted note
                             </p>
                             <div className="flex justify-between items-center gap-3">
                                 <button
-                                    onClick={() => handleRestore(note.id)}
+                                    onClick={() => handleRestore(note._id)}
                                     className="flex items-center gap-1 text-green-600 hover:text-green-700 text-sm font-medium transition"
                                 >
                                     <FiRotateCcw size={16} />
@@ -107,7 +136,7 @@ const Bin: React.FC = () => {
                 </div>
             )}
 
-            {/* ❗ Confirm Delete Modal */}
+            {/* Confirm Delete Modal */}
             <Dialog
                 open={!!deleteTarget}
                 onClose={() => setDeleteTarget(null)}
@@ -118,7 +147,7 @@ const Bin: React.FC = () => {
                         Permanently delete note?
                     </Dialog.Title>
                     <Dialog.Description className="text-sm text-slate-500 mb-4">
-                        This action cannot be undone. Are you sure you want to permanently delete&nbsp;
+                        This action cannot be undone. Delete&nbsp;
                         <span className="font-semibold">&quot;{deleteTarget?.title}&quot;</span>?
                     </Dialog.Description>
                     <div className="flex justify-end gap-3">
