@@ -2,7 +2,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { Button } from '@/components/custom/button';
-import { useSession } from "next-auth/react";
+import { useToast } from '@/hooks/useToast';
 import { 
   FaChevronLeft, 
   FaChevronRight, 
@@ -165,10 +165,12 @@ useEffect(() => {
   const hasLoadedFromServer = useRef(false);
   const lineInputRefs = useRef<(HTMLTextAreaElement | null)[]>([]);
   const fullTextRef = useRef<HTMLTextAreaElement>(null);
+  const didMountOnlineRef = useRef(false);
   const [history, setHistory] = useState<PageContent[][]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [selectedLineIndex, setSelectedLineIndex] = useState<number | null>(null);
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
+  const toast = useToast();
 
   // Font options
   const fonts = [
@@ -200,6 +202,19 @@ const currentPage = pages[pageIndex] || { lines: [''], format: [textFormat] };
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
+
+  useEffect(() => {
+    if (!didMountOnlineRef.current) {
+      didMountOnlineRef.current = true;
+      return;
+    }
+
+    if (isOnline) {
+      toast.success({ title: "Back online", description: "Changes will sync automatically." });
+    } else {
+      toast.info({ title: "You are offline", description: "Changes are saved locally until reconnected." });
+    }
+  }, [isOnline, toast]);
 
   // History helper
   const pushHistory = useCallback(() => {
@@ -349,6 +364,7 @@ const currentPage = pages[pageIndex] || { lines: [''], format: [textFormat] };
     setPages(updatedPages);
     syncToServer(updatedPages);
     setPageIndex(updatedPages.length - 1);
+    toast.success({ title: "Page added", description: `Moved to page ${updatedPages.length}.` });
   };
 
   const exportPage = () => {
@@ -362,33 +378,80 @@ const currentPage = pages[pageIndex] || { lines: [''], format: [textFormat] };
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    toast.success({ title: "Export complete", description: `Page ${pageIndex + 1} downloaded.` });
   };
 
   const copyToClipboard = () => {
-    const content = currentLines.join('\n');
-    navigator.clipboard.writeText(content).then(() => {
-      // Optional: Show a success message
-    }).catch(err => {
-      console.error('Failed to copy:', err);
-    });
+    const content = pages[pageIndex]?.lines?.join('\n') || currentLines.join('\n');
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(content)
+        .then(() => toast.success({ title: "Copied", description: "Page content copied to clipboard." }))
+        .catch(err => {
+          console.error('Failed to copy:', err);
+          toast.error({ title: "Copy failed", description: "Clipboard write failed." });
+        });
+    } else {
+      // Fallback for older browsers
+      try {
+        const textarea = document.createElement('textarea');
+        textarea.value = content;
+        textarea.style.position = 'fixed';
+        textarea.style.left = '-9999px';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        toast.success({ title: "Copied", description: "Page content copied to clipboard." });
+      } catch (err) {
+        console.error('Fallback copy failed:', err);
+        toast.error({ title: "Copy failed", description: "Clipboard is unavailable." });
+      }
+    }
   };
 
   const insertImage = () => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
+    input.style.display = 'none';
     input.onchange = (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (file) {
         const reader = new FileReader();
         reader.onload = (e) => {
           const imageUrl = e.target?.result as string;
-          handleLineChange(currentLines.length, `![Image](${imageUrl})`);
+          const idx = pages[pageIndex]?.lines?.length ?? currentLines.length;
+          handleLineChange(idx, `![Image](${imageUrl})`);
           addLine();
+          // Ensure the newly inserted line is visible and focused in Line mode,
+          // or focus the full page editor when in Full mode.
+          setTimeout(() => {
+            if (mode === 'line') {
+              setSelectedLineIndex(idx);
+              const el = lineInputRefs.current[idx];
+              if (el) {
+                el.focus();
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }
+            } else {
+              if (fullTextRef.current) {
+                fullTextRef.current.focus();
+                // place caret at end
+                const val = fullTextRef.current.value;
+                fullTextRef.current.selectionStart = fullTextRef.current.selectionEnd = val.length;
+                fullTextRef.current.scrollTop = fullTextRef.current.scrollHeight;
+              }
+            }
+          }, 60);
+          toast.success({ title: "Image inserted", description: "Image added as a new line." });
         };
         reader.readAsDataURL(file);
       }
+      // cleanup
+      if (input.parentNode) input.parentNode.removeChild(input);
     };
+    // append to DOM then click to ensure mobile browsers allow the file picker
+    document.body.appendChild(input);
     input.click();
   };
 
@@ -396,8 +459,28 @@ const currentPage = pages[pageIndex] || { lines: [''], format: [textFormat] };
     const url = prompt('Enter URL:');
     const text = prompt('Enter link text:') || url;
     if (url) {
-      handleLineChange(currentLines.length, `[${text}](${url})`);
+      const idx = pages[pageIndex]?.lines?.length ?? currentLines.length;
+      handleLineChange(idx, `[${text}](${url})`);
       addLine();
+      // Focus the inserted content similar to insertImage
+      setTimeout(() => {
+        if (mode === 'line') {
+          setSelectedLineIndex(idx);
+          const el = lineInputRefs.current[idx];
+          if (el) {
+            el.focus();
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        } else {
+          if (fullTextRef.current) {
+            fullTextRef.current.focus();
+            const val = fullTextRef.current.value;
+            fullTextRef.current.selectionStart = fullTextRef.current.selectionEnd = val.length;
+            fullTextRef.current.scrollTop = fullTextRef.current.scrollHeight;
+          }
+        }
+      }, 60);
+      toast.success({ title: "Link inserted", description: "Link added as a new line." });
     }
   };
 
@@ -437,8 +520,8 @@ const currentPage = pages[pageIndex] || { lines: [''], format: [textFormat] };
         key={index}
         className="group relative flex items-start gap-3"
       >
-        {/* Line number */}
-        <div className="w-8 flex-shrink-0 pt-3 text-right">
+        {/* Line number (hidden on very small screens) */}
+        <div className="hidden sm:block w-8 flex-shrink-0 pt-3 text-right">
           <span className="text-xs font-mono text-gray-400 select-none">
             {index + 1}
           </span>
@@ -514,6 +597,31 @@ const currentPage = pages[pageIndex] || { lines: [''], format: [textFormat] };
             </button>
           )}
         </div>
+        {/* Render markdown previews for image / link */}
+        {line && (() => {
+          const imgMatch = line.match(/^!\[[^\]]*\]\(([^)]+)\)/);
+          if (imgMatch) {
+            const src = imgMatch[1];
+            return (
+              <div className="mt-2">
+                <img src={src} alt="inserted" className="max-w-full rounded shadow-sm" />
+              </div>
+            );
+          }
+
+          const linkMatch = line.match(/^\[([^\]]+)\]\(([^)]+)\)/);
+          if (linkMatch) {
+            const text = linkMatch[1];
+            const href = linkMatch[2];
+            return (
+              <div className="mt-2">
+                <a href={href} className="text-blue-600 underline" target="_blank" rel="noreferrer">{text}</a>
+              </div>
+            );
+          }
+
+          return null;
+        })()}
       </div>
     );
   };
@@ -550,7 +658,7 @@ const currentPage = pages[pageIndex] || { lines: [''], format: [textFormat] };
     };
 
     return (
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-4xl mx-auto px-2 sm:px-6">
         <textarea
           ref={fullTextRef}
           value={currentLines.join('\n')}
@@ -566,6 +674,28 @@ const currentPage = pages[pageIndex] || { lines: [''], format: [textFormat] };
           spellCheck={true}
           placeholder="Start writing your thoughts here..."
         />
+        {/* Full-page preview for rendered markdown (images/links) */}
+        <div className="mt-4 space-y-3">
+          {currentLines.map((ln, i) => {
+            const imgMatch = ln.match(/^!\[[^\]]*\]\(([^)]+)\)/);
+            if (imgMatch) {
+              return (
+                <div key={`img-${i}`}>
+                  <img src={imgMatch[1]} alt="inserted" className="max-w-full rounded shadow-sm" />
+                </div>
+              );
+            }
+            const linkMatch = ln.match(/^\[([^\]]+)\]\(([^)]+)\)/);
+            if (linkMatch) {
+              return (
+                <div key={`link-${i}`}>
+                  <a href={linkMatch[2]} className="text-blue-600 underline" target="_blank" rel="noreferrer">{linkMatch[1]}</a>
+                </div>
+              );
+            }
+            return null;
+          })}
+        </div>
       </div>
     );
   };
@@ -906,7 +1036,7 @@ const currentPage = pages[pageIndex] || { lines: [''], format: [textFormat] };
         </div>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-auto p-6 bg-gradient-to-b from-white to-gray-50">
+        <div className="flex-1 overflow-auto p-4 sm:p-6 bg-gradient-to-b from-white to-gray-50">
           {mode === 'line' ? (
             <div className="max-w-4xl mx-auto">
               {currentLines.length > 0 ? (

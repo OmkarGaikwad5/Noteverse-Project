@@ -10,6 +10,11 @@ export interface INote extends Document<string> {
     updatedAt: Date;
     serverUpdatedAt: Date;
     createdAt: Date;
+    sharedWith?: Array<{
+        userId: mongoose.Types.ObjectId | string;
+        permission: 'view' | 'edit';
+        sharedAt: Date;
+    }>;
 }
 
 const NoteSchema: Schema = new Schema({
@@ -21,6 +26,12 @@ const NoteSchema: Schema = new Schema({
     updatedAt: { type: Date, required: true },
     serverUpdatedAt: { type: Date, default: Date.now },
     createdAt: { type: Date, default: Date.now }
+    ,
+    sharedWith: [{
+        userId: { type: Schema.Types.ObjectId, ref: 'User' },
+        permission: { type: String, enum: ['view', 'edit'], default: 'view' },
+        sharedAt: { type: Date, default: Date.now }
+    }]
 });
 
 NoteSchema.index({ userId: 1, updatedAt: -1 });

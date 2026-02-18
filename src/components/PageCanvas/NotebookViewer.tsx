@@ -11,17 +11,18 @@ const CanvasPage = dynamic(() => import('./CanvasPage'), {
 import { Button } from '@/components/custom/button';
 import { FaChevronLeft, FaChevronRight, FaPlus } from 'react-icons/fa';
 import { NotebookSyncProvider, useNotebookSync } from '@/context/NotebookSyncContext';
+import { useToast } from '@/hooks/useToast';
 
 interface NotebookViewerProps {
     notebookId: string;
-    userId: string;
 }
 
-function NotebookViewerContent({ notebookId, userId }: NotebookViewerProps) {
+function NotebookViewerContent({ notebookId }: NotebookViewerProps) {
     const [pageIndex, setPageIndex] = useState(0);
     const [pageData, setPageData] = useState<PageContent | null>(null);
     const [loading, setLoading] = useState(true);
     const { registerPageChange, isSyncing } = useNotebookSync();
+    const toast = useToast();
 
     // Fetch Page Data
     useEffect(() => {
@@ -37,16 +38,18 @@ function NotebookViewerContent({ notebookId, userId }: NotebookViewerProps) {
                 }
             } catch (e) {
                 console.error(e);
+                toast.error({ title: "Page load failed", description: "Could not fetch page data." });
             } finally {
                 setLoading(false);
             }
         };
         fetchPage();
-    }, [notebookId, pageIndex]);
+    }, [notebookId, pageIndex, toast]);
 
     const handleAddPage = async () => {
         setPageIndex(prev => prev + 1);
         setPageData(null);
+        toast.success({ title: "New page added", description: `Switched to page ${pageIndex + 2}.` });
     };
 
     const handleSave = (data: PageContent) => {
@@ -86,7 +89,7 @@ function NotebookViewerContent({ notebookId, userId }: NotebookViewerProps) {
                         </Button>
                     </div>
                     <div className="h-4 w-[1px] bg-border mx-1"></div>
-                    <Button onClick={handleAddPage} size="sm" className="bg-primary hover:bg-primary-hover text-white shadow-md hover:shadow-lg transition-all active:scale-95 gap-2">
+                    <Button onClick={handleAddPage} size="sm" className="bg-primary hover:bg-primary-hover text-black shadow-md hover:shadow-lg transition-all active:scale-95 gap-2">
                         <FaPlus className="w-3 h-3" /> Add Page
                     </Button>
                 </div>
@@ -127,11 +130,13 @@ export default function NotebookViewer(props: Omit<NotebookViewerProps, "userId"
         return <div className="p-8">Please log in to view this notebook.</div>;
     }
 
-    const userId = (session.user as any).id || session.user.email;
+    type SessionUser = { id?: string; email?: string } | undefined;
+    const userObj = session.user as SessionUser;
+    const userId: string = userObj?.id ?? userObj?.email ?? '';
 
     return (
         <NotebookSyncProvider userId={userId}>
-            <NotebookViewerContent notebookId={props.notebookId} userId={userId} />
+            <NotebookViewerContent notebookId={props.notebookId} />
         </NotebookSyncProvider>
     );
 }

@@ -20,6 +20,7 @@ import {
 } from "react-icons/fa";
 import { usePathname } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
+import { useToast } from "@/hooks/useToast";
 
 interface SearchResult {
   _id: string;
@@ -52,6 +53,7 @@ export default function Navbar() {
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showMobileSearch, setShowMobileSearch] = useState(false);
+  const toast = useToast();
   const searchRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const mobileSearchRef = useRef<HTMLDivElement>(null);
@@ -62,6 +64,7 @@ export default function Navbar() {
 
   const handleLogout = async () => {
     try {
+      const toastId = toast.loading({ title: "Signing out...", description: "Clearing your session." });
       if (session?.user) {
         await signOut({ 
           redirect: false,
@@ -76,9 +79,11 @@ export default function Navbar() {
         sessionStorage.clear();
       }
       
+      toast.update(toastId, "success", { title: "Signed out", description: "You have been logged out." });
       window.location.href = '/login';
     } catch (error) {
       console.error('Logout error:', error);
+      toast.error({ title: "Logout failed", description: "Redirecting to login." });
       window.location.href = '/login';
     }
   };
@@ -242,7 +247,10 @@ export default function Navbar() {
     
     try {
       const resAuth = await fetch('/api/auth/me');
-      if (!resAuth.ok) return;
+      if (!resAuth.ok) {
+        toast.error({ title: "Authentication required", description: "Please log in again." });
+        return;
+      }
       const userData = await resAuth.json();
 
       const res = await fetch('/api/v2/notebooks', {
@@ -259,10 +267,17 @@ export default function Navbar() {
 
       if (res.ok) {
         const data = await res.json();
+        toast.success({
+          title: `${type === "canvas" ? "Canvas" : "Notebook"} created`,
+          description: "Opening your new notebook.",
+        });
         router.push(`/notebook/${data.notebook._id}`);
+      } else {
+        toast.error({ title: "Create failed", description: "Could not create notebook." });
       }
     } catch (e) {
       console.error("Failed to create notebook:", e);
+      toast.error({ title: "Create failed", description: "Please try again." });
     }
   };
 

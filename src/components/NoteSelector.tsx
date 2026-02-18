@@ -7,6 +7,7 @@ import { FaPalette, FaBook, FaCheck, FaPen, FaPenNib } from "react-icons/fa";
 import { BsBrush } from "react-icons/bs";
 import BinButton from "./custom/BinButton";
 import { useSync } from "@/context/SyncContext";
+import { useToast } from "@/hooks/useToast";
 
 type NoteType = "canvas" | "notebook";
 
@@ -17,6 +18,9 @@ interface Note {
     createdAt: string;
     updatedAt?: string;
 }
+
+const LOCAL_STORAGE_KEY = "noteverse-notes";
+const BIN_STORAGE_KEY = "noteverse-bin";
 
 const NoteSelector: React.FC = () => {
     const [notes, setNotes] = useState<Note[]>([]);
@@ -30,9 +34,10 @@ const NoteSelector: React.FC = () => {
     const [isDeleting, setIsDeleting] = useState<boolean>(false);
     const [openMenuId, setOpenMenuId] = useState<string | null>(null);
     const [actionInProgress, setActionInProgress] = useState<string | null>(null);
+    const toast = useToast();
+    const menuRef = useRef<HTMLDivElement>(null);
 
     const { registerChange } = useSync();
-    const menuRef = useRef<HTMLDivElement>(null);
 
     // Close menu when clicking outside
     useEffect(() => {
@@ -46,93 +51,85 @@ const NoteSelector: React.FC = () => {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    const refreshNotes = useCallback(async () => {
-        try {
-            const res = await fetch("/api/notes/list", { cache: "no-store" });
-            const data = await res.json();
-            setNotes(data.notes || []);
-        } catch (error) {
-            console.error("Failed to refresh notes:", error);
-        }
+    useEffect(() => {
+        const loadNotes = async () => {
+            try {
+                const res = await fetch("/api/notes/list", { cache: "no-store" });
+                const data = await res.json();
+                setNotes(data.notes || []);
+            } catch (err) {
+                console.error("Failed to load notes", err);
+            }
+        };
+
+        loadNotes();
     }, []);
 
     useEffect(() => {
-        refreshNotes();
-    }, [refreshNotes]);
+        const handler = () => {
+            fetch("/api/notes/list")
+                .then(r => r.json())
+                .then(d => setNotes(d.notes));
+        };
 
-    useEffect(() => {
-        const handler = () => refreshNotes();
         window.addEventListener("noteverse-refresh", handler);
         return () => window.removeEventListener("noteverse-refresh", handler);
-    }, [refreshNotes]);
+    }, []);
 
-    const handleTitleEdit = useCallback(async (id: string, newTitle: string) => {
+    const handleTitleEdit = async (id: string, newTitle: string) => {
         if (!newTitle.trim() || actionInProgress) return;
         
         setActionInProgress(id);
         
         try {
-            const response = await fetch(`/api/notes/${id}/rename`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ title: newTitle.trim() })
-            });
-
-            if (!response.ok) throw new Error('Failed to rename');
-
-            // Optimistically update the UI
-            setNotes(prev => prev.map(n =>
+            const updatedNotes = notes.map((n) =>
                 n.id === id ? { ...n, title: newTitle.trim(), updatedAt: new Date().toISOString() } : n
-            ));
-            
+            );
+            setNotes(updatedNotes);
             setEditingId(null);
             setOpenMenuId(null);
             registerChange(id);
-            
-            // Refresh in background to ensure sync
-            refreshNotes();
+            toast.success({ title: "Note renamed", description: "Title updated successfully." });
         } catch (error) {
             console.error("Failed to rename note:", error);
-            // Refresh to get correct state
-            refreshNotes();
+            toast.error({ title: "Rename failed", description: "Could not update note title." });
         } finally {
             setActionInProgress(null);
         }
-    }, [actionInProgress, registerChange, refreshNotes]);
+    };
 
-    const handleDelete = useCallback(async (id: string) => {
-        if (actionInProgress) return;
+    const handleDelete = (id: string) => {
+        const noteToDelete = notes.find((n) => n.id === id);
+        if (!noteToDelete) return;
         
         setActionInProgress(id);
-        setOpenMenuId(null);
         setIsDeleting(true);
 
-        try {
-            const response = await fetch(`/api/notes/${id}/delete`, {
-                method: "DELETE"
-            });
+        const updatedNotes = notes.filter((n) => n.id !== id);
+        setNotes(updatedNotes);
 
-            if (!response.ok) throw new Error('Failed to delete');
+        const existingBin = JSON.parse(localStorage.getItem(BIN_STORAGE_KEY) || "[]");
+        const updatedBin = [{ ...noteToDelete, isDeleted: true, updatedAt: new Date().toISOString() }, ...existingBin];
+        localStorage.setItem(BIN_STORAGE_KEY, JSON.stringify(updatedBin));
 
-            // Optimistically remove from UI
-            setNotes(prev => prev.filter(n => n.id !== id));
-            
-            // Refresh in background to ensure sync
-            await refreshNotes();
-        } catch (error) {
-            console.error("Failed to delete note:", error);
-            // Refresh to get correct state
-            await refreshNotes();
-        } finally {
+        registerChange(id);
+        setOpenMenuId(null);
+        toast.success({ title: "Moved to bin", description: "You can restore it anytime from Bin." });
+
+        setTimeout(() => {
             setIsDeleting(false);
             setActionInProgress(null);
-        }
-    }, [actionInProgress, refreshNotes]);
+        }, 100);
+    };
 
-    const createNote = useCallback(async () => {
-        if (!selectedNoteType || !newNoteTitle.trim() || isCreating) return;
+    const createNote = async () => {
+        if (!selectedNoteType || !newNoteTitle.trim()) {
+            toast.info({ title: "Title required", description: "Enter a note title to continue." });
+            return;
+        }
         
         setIsCreating(true);
+        setActionInProgress('creating');
 
         try {
             const response = await fetch("/api/notes/create", {
@@ -163,19 +160,22 @@ const NoteSelector: React.FC = () => {
             setSelectedNoteType(null);
             setNewNoteTitle("");
             
-            // Refresh in background
-            refreshNotes();
+            registerChange(newNote.id);
+            toast.success({ title: "Note created", description: "Opening your new note." });
             
-            // Navigate to the new note
-            navigate.push(`/note/${data.noteId}?mode=${selectedNoteType}`);
+            // Navigate to the new note after a brief delay
+            setTimeout(() => {
+                navigate.push(`/note/${newNote.id}?mode=${newNote.type}`);
+            }, 300);
 
         } catch (err) {
             console.error("Failed to create note:", err);
-            await refreshNotes();
+            toast.error({ title: "Creation failed", description: "Could not create note." });
         } finally {
             setIsCreating(false);
+            setActionInProgress(null);
         }
-    }, [selectedNoteType, newNoteTitle, isCreating, navigate, refreshNotes]);
+    };
 
     const formatDate = useCallback((dateString: string) => {
         const date = new Date(dateString);
@@ -298,13 +298,12 @@ const NoteSelector: React.FC = () => {
                                                 </div>
 
                                                 {/* Options Menu */}
-                                                <div className="relative" ref={isMenuOpen ? menuRef : null}>
+                                                <div className="relative flex items-center gap-2">
                                                     <button
+                                                        type="button"
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            if (!isProcessing) {
-                                                                setOpenMenuId(isMenuOpen ? null : note.id);
-                                                            }
+                                                            setOpenMenuId(isMenuOpen ? null : note.id);
                                                         }}
                                                         disabled={isProcessing}
                                                         className={`p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
@@ -312,13 +311,15 @@ const NoteSelector: React.FC = () => {
                                                     >
                                                         <FiMoreVertical className="text-sm sm:text-base" />
                                                     </button>
-
+                                                    
                                                     {isMenuOpen && (
-                                                        <div 
-                                                            className="absolute right-0 top-full mt-1 w-40 sm:w-48 bg-white rounded-lg shadow-xl border border-gray-200 z-50 animate-in fade-in slide-in-from-top-2 duration-200"
+                                                        <div
+                                                            ref={menuRef}
                                                             onClick={(e) => e.stopPropagation()}
+                                                            className="absolute right-0 top-full mt-1 w-40 sm:w-48 bg-white rounded-lg shadow-xl border border-gray-200 z-10 animate-in fade-in slide-in-from-top-2 duration-200"
                                                         >
                                                             <button
+                                                                type="button"
                                                                 onClick={(e) => {
                                                                     e.preventDefault();
                                                                     setEditingId(note.id);
@@ -332,6 +333,7 @@ const NoteSelector: React.FC = () => {
                                                                 Rename
                                                             </button>
                                                             <button
+                                                                type="button"
                                                                 onClick={(e) => {
                                                                     e.preventDefault();
                                                                     handleDelete(note.id);

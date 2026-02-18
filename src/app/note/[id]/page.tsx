@@ -4,6 +4,7 @@ import { useParams, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 const CanvasBoard = dynamic(() => import("@/components/CanvasBoard"), {ssr: false});
 const Notebook = dynamic(() =>  import("@/components/Notebook"), {ssr: false});
+const SharingPanel = dynamic(() => import('@/components/SharingPanel'), { ssr: false });
 
 export default function NotePage() {
   const params = useParams(); // this is now correct
@@ -21,14 +22,19 @@ export default function NotePage() {
   }
 
   return (
-    <div className="p-4">
-      {mode === "canvas" ? (
-        <CanvasBoard noteId={noteId} />
-      ) : mode === "notebook" ? (
-        <Notebook noteId={noteId} />
-      ) : (
-        <div>⚠️ Invalid mode: {mode}</div>
-      )}
+    <div className="p-4 space-y-4">
+      <div className="flex justify-end">
+        <SharingPanel noteId={noteId} />
+      </div>
+      <div>
+        {mode === "canvas" ? (
+          <CanvasBoard noteId={noteId} />
+        ) : mode === "notebook" ? (
+          <Notebook noteId={noteId} />
+        ) : (
+          <div>⚠️ Invalid mode: {mode}</div>
+        )}
+      </div>
     </div>
   );
 }

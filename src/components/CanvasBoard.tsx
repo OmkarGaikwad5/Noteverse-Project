@@ -167,6 +167,7 @@ export default function MicrosoftStyleCanvasBoard({ noteId }: { noteId: string }
   
   // Refs
   const stageRef = useRef<Konva.Stage | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const shapeStart = useRef<{ x: number; y: number } | null>(null);
   const [selectedElement, setSelectedElement] = useState<{
     type: 'shape' | 'text' | 'sticky';
@@ -237,28 +238,32 @@ export default function MicrosoftStyleCanvasBoard({ noteId }: { noteId: string }
   // Handle window resize
   useEffect(() => {
     const handleResize = () => {
-      const isMobile = window.innerWidth < 768;
-      setStageSize({
-        width: window.innerWidth,
-        height: window.innerHeight - (isMobile ? 120 : 64)
-      });
+      // Prefer container size so the canvas fits the layout responsively
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (rect) {
+        setStageSize({
+          width: Math.max(320, Math.floor(rect.width)),
+          height: Math.max(240, Math.floor(rect.height))
+        });
+      } else {
+        setStageSize({
+          width: Math.max(320, window.innerWidth - (showToolbar ? 256 : 0)),
+          height: Math.max(240, window.innerHeight - 64)
+        });
+      }
     };
 
     handleResize();
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  // Close mobile menu when screen becomes larger
-  useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth >= 768) {
-        setShowMobileMenu(false);
-      }
+    // Also observe container resize (in case of layout changes like toolbar toggles)
+    const RO = (window as any).ResizeObserver;
+    const ro = typeof RO === 'function' ? new RO(() => handleResize()) : null;
+    if (containerRef.current && ro) ro.observe(containerRef.current);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      if (containerRef.current && ro && typeof ro.unobserve === 'function') ro.unobserve(containerRef.current);
     };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  }, [showToolbar]);
 
   // History management
   const pushHistory = useCallback(() => {
@@ -872,105 +877,15 @@ export default function MicrosoftStyleCanvasBoard({ noteId }: { noteId: string }
         </div>
       </div>
 
-      {/* Mobile Menu Overlay */}
-      {showMobileMenu && (
-        <div className="md:hidden fixed inset-0 z-50 bg-black bg-opacity-50">
-          <div className="absolute left-0 top-0 bottom-0 w-64 bg-white shadow-xl overflow-y-auto">
-            <div className="p-4">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-gray-900">Tools</h3>
-                <button
-                  onClick={() => setShowMobileMenu(false)}
-                  className="p-1 hover:bg-gray-100 rounded"
-                >
-                  <FaTimes />
-                </button>
-              </div>
-              
-              {/* Mobile Tools Grid */}
-              <div className="space-y-6">
-                {/* Tools Section */}
-                <div className="space-y-2">
-                  <h4 className="text-xs font-semibold text-gray-500 uppercase">Tools</h4>
-                  <div className="grid grid-cols-4 gap-2">
-                    {toolDefinitions.map((tool) => (
-                      <button
-                        key={tool.mode}
-                        onClick={() => {
-                          setMode(tool.mode);
-                          setShowMobileMenu(false);
-                        }}
-                        className={`flex flex-col items-center justify-center p-2 rounded-lg ${
-                          mode === tool.mode
-                            ? 'bg-blue-50 border border-blue-200'
-                            : 'bg-gray-50 hover:bg-gray-100'
-                        }`}
-                      >
-                        <div className={`text-base ${mode === tool.mode ? 'text-blue-600' : 'text-gray-600'}`}>
-                          {tool.icon}
-                        </div>
-                        <span className="text-xs mt-1 text-gray-600">{tool.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Colors */}
-                <div className="space-y-2">
-                  <h4 className="text-xs font-semibold text-gray-500 uppercase">Colors</h4>
-                  <div className="grid grid-cols-5 gap-2">
-                    {colors.slice(0, 10).map((color) => (
-                      <button
-                        key={color}
-                        onClick={() => {
-                          setPenColor(color);
-                          setShowMobileMenu(false);
-                        }}
-                        className={`w-8 h-8 rounded border-2 ${
-                          penColor === color ? 'border-blue-500' : 'border-gray-200'
-                        }`}
-                        style={{ backgroundColor: color }}
-                      />
-                    ))}
-                  </div>
-                </div>
-
-                {/* Export Button */}
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={() => {
-                    exportCanvas();
-                    setShowMobileMenu(false);
-                  }}
-                  className="w-full gap-2"
-                >
-                  <FaDownload /> Export Canvas
-                </Button>
-
-                {/* Clear Page */}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    clearPage();
-                    setShowMobileMenu(false);
-                  }}
-                  className="w-full gap-2"
-                >
-                  <FaTrash /> Clear Page
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Main Content */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Side Toolbar - Hidden on mobile */}
-        {showToolbar && !isMobile && (
-          <div className="w-64 bg-white border-r border-gray-200 shadow-lg overflow-y-auto hidden md:block">
+        {/* Side Toolbar */}
+        {showToolbar && (
+          <div 
+            className={`hidden md:block w-64 bg-white border-r border-gray-200 shadow-lg overflow-y-auto transition-all duration-300 ${
+              showToolbar ? 'translate-x-0' : '-translate-x-full'
+            }`}
+          >
             <div className="p-4 space-y-6">
               {/* Tools Section */}
               <div className="space-y-2">
@@ -1229,22 +1144,10 @@ export default function MicrosoftStyleCanvasBoard({ noteId }: { noteId: string }
         )}
 
         {/* Main Canvas Area */}
-        <div className="flex-1 relative overflow-hidden">
-          {/* Floating Toolbar for quick access - Responsive */}
-          <div className="absolute top-2 left-2 sm:top-4 sm:left-4 z-10 bg-white rounded-lg shadow-lg border border-gray-200 p-1 sm:p-2">
-            <div className="flex items-center gap-0.5 sm:gap-1">
-              {/* Toolbar Toggle - Only on mobile */}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowMobileMenu(true)}
-                className="md:hidden h-8 w-8 p-0"
-                title="Show tools"
-              >
-                <FaBars className="text-sm" />
-              </Button>
-
-              {/* Desktop toolbar toggle */}
+        <div ref={containerRef} className="flex-1 relative overflow-hidden min-h-0">
+          {/* Floating Toolbar for quick access */}
+          <div className="absolute top-4 left-4 z-10 bg-white rounded-lg shadow-lg border border-gray-200 p-2">
+            <div className="flex items-center gap-1">
               <Button
                 variant="ghost"
                 size="sm"

@@ -3,14 +3,17 @@
 
 import React, { useState } from 'react';
 import { Button } from '@/components/custom/button';
+import { useToast } from '@/hooks/useToast';
 
 export default function LegacyNotesMigration() {
     const [migrating, setMigrating] = useState(false);
+    const toast = useToast();
 
     const handleMigrate = async () => {
         if (!confirm("This will convert your old Local Notes to new Cloud Notebooks. Continue?")) return;
 
         setMigrating(true);
+        let migrationToastId: string | null = null;
         try {
             // Fetch old local notes from localStorage keys manually for now
             // or fetch from API if they were synced.
@@ -23,6 +26,8 @@ export default function LegacyNotesMigration() {
             const listJson = localStorage.getItem('noteverse-notes');
             if (listJson) {
                 const notes = JSON.parse(listJson);
+                const total = notes.length;
+                migrationToastId = toast.loading({ title: "Migration started", description: `Migrating ${total} legacy note(s).` });
                 for (const note of notes) {
                     // Create Notebook
                     const resAuth = await fetch('/api/auth/me');
@@ -74,11 +79,19 @@ export default function LegacyNotesMigration() {
                         });
                     }
                 }
-                alert("Migration Complete! Please refresh.");
+                if (migrationToastId) {
+                    toast.update(migrationToastId, "success", { title: "Migration complete", description: "Legacy notes were imported successfully." });
+                }
+            } else {
+                toast.info({ title: "No legacy notes found", description: "Nothing to migrate." });
             }
         } catch (e) {
             console.error(e);
-            alert("Migration Failed");
+            if (migrationToastId) {
+                toast.update(migrationToastId, "error", { title: "Migration failed", description: "Please try again." });
+            } else {
+                toast.error({ title: "Migration failed", description: "Please try again." });
+            }
         } finally {
             setMigrating(false);
         }
