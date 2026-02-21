@@ -1,4 +1,5 @@
 import GoogleProvider from "next-auth/providers/google";
+import GitHubProvider from "next-auth/providers/github";
 import CredentialsProvider from "next-auth/providers/credentials";
 import type { NextAuthOptions } from "next-auth";
 import dbConnect from "@/lib/db";
@@ -12,6 +13,12 @@ export const authOptions: NextAuthOptions = {
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+    }),
+
+    /* ---------------- GITHUB LOGIN ---------------- */
+    GitHubProvider({
+      clientId: process.env.GITHUB_ID!,
+      clientSecret: process.env.GITHUB_SECRET!,
     }),
 
     /* ---------------- EMAIL LOGIN ---------------- */
@@ -34,40 +41,41 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
 
-  /* ================= MAGIC HAPPENS HERE ================= */
   callbacks: {
-    async signIn({ user, account, profile }) {
+    /* ================= CREATE / LINK USER ================= */
+    async signIn({ user, account }) {
       await dbConnect();
 
-      // Only for Google login
-      if (account?.provider === "google") {
-        let dbUser = await User.findOne({ email: user.email });
+      if (!user?.email) return false;
 
-        // Create user if first login
-        if (!dbUser) {
-          dbUser = await User.create({
-            name: user.name,
-            email: user.email,
-            image: user.image,
-            provider: "google",
-          });
-        }
+      let dbUser = await User.findOne({ email: user.email });
 
-        // Replace OAuth id with Mongo id
-        user.id = dbUser._id.toString();
+      // First time login → create
+      if (!dbUser) {
+        dbUser = await User.create({
+          name: user.name,
+          email: user.email,
+          image: user.image,
+          provider: account?.provider, // google or github
+        });
       }
+
+      // IMPORTANT: replace OAuth id with Mongo id
+      user.id = dbUser._id.toString();
 
       return true;
     },
 
+    /* ================= STORE ID IN TOKEN ================= */
     async jwt({ token, user }) {
       if (user) token.id = user.id;
       return token;
     },
 
+    /* ================= EXPOSE ID TO FRONTEND ================= */
     async session({ session, token }) {
       if (session.user) {
-        session.user.id = token.id as string; // ALWAYS Mongo ObjectId
+        session.user.id = token.id as string;
       }
       return session;
     },
