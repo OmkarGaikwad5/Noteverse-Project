@@ -9,60 +9,136 @@ import { useToast } from '@/hooks/useToast';
 type NoteType = 'canvas' | 'notebook';
 
 interface Note {
-    id: string;
+    _id: string;
+    id?: string; // Some notes might use id instead of _id
     title: string;
     type: NoteType;
     createdAt: string;
+    updatedAt?: string;
+    isDeleted?: boolean;
 }
 
-const BIN_STORAGE_KEY = 'noteverse-bin';
-const NOTES_STORAGE_KEY = 'noteverse-notes';
+// Storage keys
+const NOTES_STORAGE_KEY = "noteverse-notes";
+const BIN_STORAGE_KEY = "noteverse-bin";
 
 const Bin: React.FC = () => {
     const [deletedNotes, setDeletedNotes] = useState<Note[]>([]);
     const [deleteTarget, setDeleteTarget] = useState<Note | null>(null);
+    const [loading, setLoading] = useState(true);
     const navigate = useRouter();
     const toast = useToast();
+
     useEffect(() => {
-        const binData = localStorage.getItem(BIN_STORAGE_KEY);
-        if (binData) setDeletedNotes(JSON.parse(binData));
+        loadBin();
     }, []);
 
+    const loadBin = () => {
+        setLoading(true);
+        try {
+            const binData = localStorage.getItem(BIN_STORAGE_KEY);
+            const parsedBin = binData ? JSON.parse(binData) : [];
+            
+            // Ensure each note has an id field for compatibility
+            const normalizedBin = parsedBin.map((note: Note) => ({
+                ...note,
+                id: note._id || note.id
+            }));
+            
+            setDeletedNotes(normalizedBin);
+        } catch (error) {
+            console.error("Failed to load bin:", error);
+            toast.error({ title: "Error", description: "Failed to load deleted notes." });
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const handleRestore = (id: string) => {
-        const note = deletedNotes.find((n) => n.id === id);
+        const note = deletedNotes.find((n) => n._id === id || n.id === id);
         if (!note) return;
 
-        const updatedBin = deletedNotes.filter((n) => n.id !== id);
-        localStorage.setItem(BIN_STORAGE_KEY, JSON.stringify(updatedBin));
-        setDeletedNotes(updatedBin);
-
-        const existingNotes = JSON.parse(localStorage.getItem(NOTES_STORAGE_KEY) || '[]');
-        const updatedNotes = [note, ...existingNotes];
-        localStorage.setItem(NOTES_STORAGE_KEY, JSON.stringify(updatedNotes));
-        toast.success({ title: "Note restored", description: `"${note.title}" moved back to notes.` });
+        try {
+            // Remove from bin
+            const updatedBin = deletedNotes.filter((n) => n._id !== id && n.id !== id);
+            localStorage.setItem(BIN_STORAGE_KEY, JSON.stringify(updatedBin));
+            
+            // Add back to notes
+            const existingNotes = JSON.parse(localStorage.getItem(NOTES_STORAGE_KEY) || '[]');
+            
+            // Create a clean note object for restoration
+            const restoredNote = {
+                ...note,
+                id: note._id || note.id,
+                updatedAt: new Date().toISOString(),
+                isDeleted: false
+            };
+            
+            // Remove the _id field if it exists to avoid duplication
+            if (restoredNote._id && !restoredNote.id) {
+                restoredNote.id = restoredNote._id;
+            }
+            
+            const updatedNotes = [restoredNote, ...existingNotes];
+            localStorage.setItem(NOTES_STORAGE_KEY, JSON.stringify(updatedNotes));
+            
+            setDeletedNotes(updatedBin);
+            toast.success({ 
+                title: "Note restored", 
+                description: `"${note.title}" moved back to notes.` 
+            });
+        } catch (error) {
+            console.error("Failed to restore note:", error);
+            toast.error({ title: "Error", description: "Failed to restore note." });
+        }
     };
 
     const handlePermanentDelete = () => {
         if (!deleteTarget) return;
-        const deletedTitle = deleteTarget.title;
-        const updatedBin = deletedNotes.filter((n) => n.id !== deleteTarget.id);
-        localStorage.setItem(BIN_STORAGE_KEY, JSON.stringify(updatedBin));
-        setDeletedNotes(updatedBin);
-        setDeleteTarget(null);
-        toast.success({ title: "Deleted permanently", description: `"${deletedTitle}" was removed.` });
+        
+        try {
+            const deletedTitle = deleteTarget.title;
+            const id = deleteTarget._id || deleteTarget.id;
+            
+            const updatedBin = deletedNotes.filter((n) => n._id !== id && n.id !== id);
+            localStorage.setItem(BIN_STORAGE_KEY, JSON.stringify(updatedBin));
+            
+            setDeletedNotes(updatedBin);
+            setDeleteTarget(null);
+            
+            toast.success({ 
+                title: "Deleted permanently", 
+                description: `"${deletedTitle}" was removed.` 
+            });
+        } catch (error) {
+            console.error("Failed to delete note permanently:", error);
+            toast.error({ title: "Error", description: "Failed to delete note." });
+        }
     };
+
+    const getNoteId = (note: Note): string => {
+        return note._id || note.id || '';
+    };
+
+    if (loading) {
+        return (
+            <div className="p-6 md:p-10 min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+                <div className="flex items-center justify-center h-64">
+                    <div className="text-gray-500">Loading...</div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="p-6 md:p-10 min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
             <div className="flex items-center justify-between mb-8">
                 <div onClick={() => navigate.push('/home')} className='flex cursor-pointer items-center gap-5'>
-                    <span className=''>
+                    <span>
                         <FaArrowLeft size={20} />
                     </span>
                     <h1 className="text-3xl flex gap-2 items-center font-bold text-slate-800">
-                        <span>
-                            <FiTrash2 size={26} />
-                        </span>
+                        <FiTrash2 size={26} />
                         Bin
                     </h1>
                 </div>
@@ -81,7 +157,7 @@ const Bin: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {deletedNotes.map((note) => (
                         <div
-                            key={note.id}
+                            key={getNoteId(note)}
                             className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm hover:shadow-md transition duration-300"
                         >
                             <div className="mb-2">
@@ -89,11 +165,11 @@ const Bin: React.FC = () => {
                                 <p className="text-sm text-gray-500 capitalize">{note.type}</p>
                             </div>
                             <p className="text-xs text-gray-400 mb-4">
-                                Deleted on {new Date(note.createdAt).toLocaleString()}
+                                Deleted on {note.updatedAt ? new Date(note.updatedAt).toLocaleDateString() : 'recently'}
                             </p>
                             <div className="flex justify-between items-center gap-3">
                                 <button
-                                    onClick={() => handleRestore(note.id)}
+                                    onClick={() => handleRestore(getNoteId(note))}
                                     className="flex items-center gap-1 text-green-600 hover:text-green-700 text-sm font-medium transition"
                                 >
                                     <FiRotateCcw size={16} />
@@ -112,7 +188,7 @@ const Bin: React.FC = () => {
                 </div>
             )}
 
-            {/* ❗ Confirm Delete Modal */}
+            {/* Confirm Delete Modal */}
             <Dialog
                 open={!!deleteTarget}
                 onClose={() => setDeleteTarget(null)}
@@ -123,7 +199,7 @@ const Bin: React.FC = () => {
                         Permanently delete note?
                     </Dialog.Title>
                     <Dialog.Description className="text-sm text-slate-500 mb-4">
-                        This action cannot be undone. Are you sure you want to permanently delete&nbsp;
+                        This action cannot be undone. Delete&nbsp;
                         <span className="font-semibold">&quot;{deleteTarget?.title}&quot;</span>?
                     </Dialog.Description>
                     <div className="flex justify-end gap-3">

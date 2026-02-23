@@ -1,5 +1,6 @@
 'use client';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useSession } from 'next-auth/react';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { Button } from '@/components/custom/button';
 import { useToast } from '@/hooks/useToast';
@@ -72,6 +73,43 @@ export default function Notebook({ noteId }: { noteId: string }) {
     headingLevel: 0
   });
 
+  const { data: session } = useSession();
+
+  const saveToServer = React.useRef<NodeJS.Timeout | null>(null);
+  const hasLoadedFromServer = useRef(false);
+  const didMountOnlineRef = useRef(false);
+
+const syncToServer = (newPages: PageContent[]) => {
+  if (!session?.user?.id) return;
+
+  if (saveToServer.current) clearTimeout(saveToServer.current);
+
+  saveToServer.current = setTimeout(async () => {
+    try {
+
+      const text = newPages.flatMap(p => p.lines).join("\n");
+
+      await fetch(`/api/notes/${noteId}/content`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "notebook",
+          userId: session.user.id,
+          updatedAt: new Date().toISOString(),
+          data: {
+            ops: [{ insert: text || "\n" }]   // ⭐ CRITICAL FIX
+          }
+        })
+      });
+
+      console.log("SYNC SUCCESS");
+
+    } catch (err) {
+      console.error("SYNC FAILED", err);
+    }
+  }, 700);
+};
+
   // Using usePersistentState for auto-sync and persistence
   const [pages, setPages] = usePersistentState<PageContent[]>(storageKey, [{
     id: Date.now().toString(),
@@ -82,9 +120,49 @@ export default function Notebook({ noteId }: { noteId: string }) {
     updatedAt: new Date().toISOString()
   }], noteId);
 
+  const [loadingFromServer, setLoadingFromServer] = useState(true);
+
+/* ---------------- LOAD NOTE CONTENT FROM DATABASE ---------------- */
+useEffect(() => {
+  if (!noteId || hasLoadedFromServer.current) return;
+
+  const loadFromServer = async () => {
+    try {
+      const res = await fetch(`/api/notes/${noteId}/content`);
+      const json = await res.json();
+
+      console.log("LOADED FROM API:", json);
+
+      if (json?.type === "notebook" && json?.data?.ops) {
+
+        const text = json.data.ops.map((op:any)=>op.insert || "").join("");
+        const lines = text.split("\n");
+
+        const newPage: PageContent = {
+          id: Date.now().toString(),
+          lines: lines.length ? lines : [""],
+          format: lines.map(()=>({...textFormat})),
+          version: 1,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+
+        setPages([newPage]);
+        hasLoadedFromServer.current = true;   // 🚀 IMPORTANT
+      }
+
+    } catch (e) {
+      console.error("LOAD NOTE FAILED", e);
+    } finally {
+      setLoadingFromServer(false);
+    }
+  };
+
+  loadFromServer();
+}, [noteId, setPages, textFormat]);
+
   const lineInputRefs = useRef<(HTMLTextAreaElement | null)[]>([]);
   const fullTextRef = useRef<HTMLTextAreaElement>(null);
-  const didMountOnlineRef = useRef(false);
   const [history, setHistory] = useState<PageContent[][]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [selectedLineIndex, setSelectedLineIndex] = useState<number | null>(null);
@@ -101,7 +179,8 @@ export default function Notebook({ noteId }: { noteId: string }) {
     { name: 'Verdana', value: 'Verdana, sans-serif' }
   ];
 
-  const currentPage = pages[pageIndex] || { lines: [''], format: [textFormat] };
+const currentPage = pages[pageIndex] || { lines: [''], format: [textFormat] };
+
   const currentLines = currentPage.lines || [''];
   const currentFormats = currentPage.format || [textFormat];
 
@@ -178,6 +257,8 @@ export default function Notebook({ noteId }: { noteId: string }) {
     };
     
     setPages(updatedPages);
+    syncToServer(updatedPages);
+
     setTextFormat(prev => ({ ...prev, ...format }));
   };
 
@@ -209,6 +290,7 @@ export default function Notebook({ noteId }: { noteId: string }) {
     };
     
     setPages(updatedPages);
+    syncToServer(updatedPages);
   };
 
   const addLine = () => {
@@ -226,6 +308,7 @@ export default function Notebook({ noteId }: { noteId: string }) {
     };
     
     setPages(updatedPages);
+    syncToServer(updatedPages);
     
     setTimeout(() => {
       const lastRef = lineInputRefs.current[updatedLines.length - 1];
@@ -255,6 +338,7 @@ export default function Notebook({ noteId }: { noteId: string }) {
     };
     
     setPages(updatedPages);
+    syncToServer(updatedPages);
     setSelectedLineIndex(null);
   };
 
@@ -271,6 +355,7 @@ export default function Notebook({ noteId }: { noteId: string }) {
     
     const updatedPages = [...pages, newPage];
     setPages(updatedPages);
+    syncToServer(updatedPages);
     setPageIndex(updatedPages.length - 1);
     toast.success({ title: "Page added", description: `Moved to page ${updatedPages.length}.` });
   };
@@ -358,7 +443,7 @@ export default function Notebook({ noteId }: { noteId: string }) {
       // cleanup
       if (input.parentNode) input.parentNode.removeChild(input);
     };
-    // append to DOM then click to ensure mobile browsers allow the file picker
+    // append to DOM then click to allow mobile browsers to allow the file picker
     document.body.appendChild(input);
     input.click();
   };
@@ -550,6 +635,7 @@ export default function Notebook({ noteId }: { noteId: string }) {
       };
       
       setPages(updatedPages);
+      syncToServer(updatedPages);
     };
 
     const fullTextStyle: React.CSSProperties = {
@@ -612,380 +698,388 @@ export default function Notebook({ noteId }: { noteId: string }) {
   }, []);
 
   return (
-    <div className={`h-screen ${fullscreen ? 'p-0' : 'p-4'} bg-gradient-to-br from-gray-50 to-blue-50`}>
-      <div className={`${fullscreen ? 'h-screen rounded-none' : 'h-full rounded-2xl shadow-2xl'} bg-white border border-gray-200 overflow-hidden flex flex-col`}>
+   <>
+    {loadingFromServer ? (
+      <div className="h-screen flex items-center justify-center text-gray-500 text-lg">
+        Loading note from database...
+      </div>
+    ) : (
+      <div className={`h-screen ${fullscreen ? 'p-0' : 'p-4'} bg-gradient-to-br from-gray-50 to-blue-50`}>
+        <div className={`${fullscreen ? 'h-screen rounded-none' : 'h-full rounded-2xl shadow-2xl'} bg-white border border-gray-200 overflow-hidden flex flex-col`}>
         
-        {/* Top Toolbar */}
-        <div className="border-b border-gray-200 bg-white p-3">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            {/* Left Section */}
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
-                  <FaFileAlt className="text-white text-lg" />
+          {/* Top Toolbar */}
+          <div className="border-b border-gray-200 bg-white p-3">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              {/* Left Section */}
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
+                    <FaFileAlt className="text-white text-lg" />
+                  </div>
+                  <span className="font-bold text-lg">Notebook</span>
                 </div>
-                <span className="font-bold text-lg">Notebook</span>
-              </div>
-              
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={undo}
-                  className="h-9 w-9 p-0"
-                  title="Undo"
-                >
-                  <FaUndo className="text-base" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={redo}
-                  className="h-9 w-9 p-0"
-                  title="Redo"
-                >
-                  <FaRedo className="text-base" />
-                </Button>
                 
-                {/* Online/Offline indicator */}
-                <div className={`ml-2 px-3 py-1.5 rounded text-sm font-medium ${isOnline ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                  {isOnline ? 'Online' : 'Offline'}
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={undo}
+                    className="h-9 w-9 p-0"
+                    title="Undo"
+                  >
+                    <FaUndo className="text-base" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={redo}
+                    className="h-9 w-9 p-0"
+                    title="Redo"
+                  >
+                    <FaRedo className="text-base" />
+                  </Button>
+                  
+                  {/* Online/Offline indicator */}
+                  <div className={`ml-2 px-3 py-1.5 rounded text-sm font-medium ${isOnline ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                    {isOnline ? 'Online' : 'Offline'}
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Center - Page Navigation */}
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 bg-gray-100 rounded-lg px-3 py-1.5">
+              {/* Center - Page Navigation */}
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2 bg-gray-100 rounded-lg px-3 py-1.5">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setPageIndex(prev => Math.max(0, prev - 1))}
+                    disabled={pageIndex === 0}
+                    className="h-7 w-7 p-0"
+                  >
+                    <FaChevronLeft className="text-sm" />
+                  </Button>
+                  <span className="text-sm font-medium">
+                    Page {pageIndex + 1} of {pages.length}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setPageIndex(prev => Math.min(pages.length - 1, prev + 1))}
+                    disabled={pageIndex === pages.length - 1}
+                    className="h-7 w-7 p-0"
+                  >
+                    <FaChevronRight className="text-sm" />
+                  </Button>
+                </div>
+              </div>
+
+              {/* Right Section */}
+              <div className="flex items-center gap-2">
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setPageIndex(prev => Math.max(0, prev - 1))}
-                  disabled={pageIndex === 0}
-                  className="h-7 w-7 p-0"
+                  onClick={copyToClipboard}
+                  className="gap-2 h-9"
+                  title="Copy to clipboard"
                 >
-                  <FaChevronLeft className="text-sm" />
+                  <FaCopy className="text-base" />
+                  <span className="hidden sm:inline">Copy</span>
                 </Button>
-                <span className="text-sm font-medium">
-                  Page {pageIndex + 1} of {pages.length}
-                </span>
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setPageIndex(prev => Math.min(pages.length - 1, prev + 1))}
-                  disabled={pageIndex === pages.length - 1}
-                  className="h-7 w-7 p-0"
+                  onClick={exportPage}
+                  className="gap-2 h-9"
+                  title="Export as text file"
                 >
-                  <FaChevronRight className="text-sm" />
+                  <FaDownload className="text-base" />
+                  <span className="hidden sm:inline">Export</span>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setFullscreen(!fullscreen)}
+                  className="gap-2 h-9"
+                  title={fullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+                >
+                  {fullscreen ? <FaCompress className="text-base" /> : <FaExpand className="text-base" />}
                 </Button>
               </div>
             </div>
+          </div>
 
-            {/* Right Section */}
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={copyToClipboard}
-                className="gap-2 h-9"
-                title="Copy to clipboard"
+          {/* Formatting Toolbar */}
+          <div className="border-b border-gray-200 bg-gray-50 p-3">
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Font Family */}
+              <select
+                value={textFormat.fontFamily}
+                onChange={(e) => applyFormatToSelection({ fontFamily: e.target.value })}
+                className="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
-                <FaCopy className="text-base" />
-                <span className="hidden sm:inline">Copy</span>
+                {fonts.map(font => (
+                  <option key={font.value} value={font.value}>{font.name}</option>
+                ))}
+              </select>
+
+              {/* Font Size */}
+              <select
+                value={textFormat.fontSize}
+                onChange={(e) => applyFormatToSelection({ fontSize: parseInt(e.target.value) })}
+                className="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                {[12, 14, 16, 18, 20, 24, 28, 32, 36, 48].map(size => (
+                  <option key={size} value={size}>{size}px</option>
+                ))}
+              </select>
+
+              <div className="w-px h-6 bg-gray-300 mx-1"></div>
+
+              {/* Text Formatting */}
+              <Button
+                variant={textFormat.bold ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => applyFormatToSelection({ bold: !textFormat.bold })}
+                className="h-9 w-9 p-0"
+                title="Bold"
+              >
+                <FaBold className="text-base" />
               </Button>
               <Button
-                variant="ghost"
+                variant={textFormat.italic ? "secondary" : "ghost"}
                 size="sm"
-                onClick={exportPage}
-                className="gap-2 h-9"
-                title="Export as text file"
+                onClick={() => applyFormatToSelection({ italic: !textFormat.italic })}
+                className="h-9 w-9 p-0"
+                title="Italic"
               >
-                <FaDownload className="text-base" />
-                <span className="hidden sm:inline">Export</span>
+                <FaItalic className="text-base" />
               </Button>
               <Button
-                variant="ghost"
+                variant={textFormat.underline ? "secondary" : "ghost"}
                 size="sm"
-                onClick={() => setFullscreen(!fullscreen)}
-                className="gap-2 h-9"
-                title={fullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+                onClick={() => applyFormatToSelection({ underline: !textFormat.underline })}
+                className="h-9 w-9 p-0"
+                title="Underline"
               >
-                {fullscreen ? <FaCompress className="text-base" /> : <FaExpand className="text-base" />}
+                <FaUnderline className="text-base" />
               </Button>
+              <Button
+                variant={textFormat.strikethrough ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => applyFormatToSelection({ strikethrough: !textFormat.strikethrough })}
+                className="h-9 w-9 p-0"
+                title="Strikethrough"
+              >
+                <FaStrikethrough className="text-base" />
+              </Button>
+
+              <div className="w-px h-6 bg-gray-300 mx-1"></div>
+
+              {/* Text Alignment */}
+              <Button
+                variant={textFormat.align === 'left' ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => applyFormatToSelection({ align: 'left' })}
+                className="h-9 w-9 p-0"
+                title="Align Left"
+              >
+                <FaAlignLeft className="text-base" />
+              </Button>
+              <Button
+                variant={textFormat.align === 'center' ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => applyFormatToSelection({ align: 'center' })}
+                className="h-9 w-9 p-0"
+                title="Align Center"
+              >
+                <FaAlignCenter className="text-base" />
+              </Button>
+              <Button
+                variant={textFormat.align === 'right' ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => applyFormatToSelection({ align: 'right' })}
+                className="h-9 w-9 p-0"
+                title="Align Right"
+              >
+                <FaAlignRight className="text-base" />
+              </Button>
+
+              <div className="w-px h-6 bg-gray-300 mx-1"></div>
+
+              {/* Lists */}
+              <Button
+                variant={textFormat.listType === 'bullet' ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => applyFormatToSelection({ listType: textFormat.listType === 'bullet' ? 'none' : 'bullet' })}
+                className="h-9 w-9 p-0"
+                title="Bullet List"
+              >
+                <FaListUl className="text-base" />
+              </Button>
+              <Button
+                variant={textFormat.listType === 'number' ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => applyFormatToSelection({ listType: textFormat.listType === 'number' ? 'none' : 'number' })}
+                className="h-9 w-9 p-0"
+                title="Numbered List"
+              >
+                <FaListOl className="text-base" />
+              </Button>
+
+              <div className="w-px h-6 bg-gray-300 mx-1"></div>
+
+              {/* Headings */}
+              <Button
+                variant={textFormat.headingLevel === 1 ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => applyFormatToSelection({ headingLevel: textFormat.headingLevel === 1 ? 0 : 1 })}
+                className="h-9 w-9 p-0 font-bold"
+                title="Heading 1"
+              >
+                H1
+              </Button>
+              <Button
+                variant={textFormat.headingLevel === 2 ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => applyFormatToSelection({ headingLevel: textFormat.headingLevel === 2 ? 0 : 2 })}
+                className="h-9 w-9 p-0 font-bold"
+                title="Heading 2"
+              >
+                H2
+              </Button>
+
+              <div className="w-px h-6 bg-gray-300 mx-1"></div>
+
+              {/* Color Picker */}
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={textFormat.color}
+                  onChange={(e) => applyFormatToSelection({ color: e.target.value })}
+                  className="w-9 h-9 cursor-pointer rounded border border-gray-300"
+                  title="Text Color"
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => applyFormatToSelection({ highlight: '#FEF3C7' })}
+                  className="h-9 w-9 p-0"
+                  title="Highlight"
+                >
+                  <FaHighlighter className="text-base" />
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Formatting Toolbar */}
-        <div className="border-b border-gray-200 bg-gray-50 p-3">
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Font Family */}
-            <select
-              value={textFormat.fontFamily}
-              onChange={(e) => applyFormatToSelection({ fontFamily: e.target.value })}
-              className="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              {fonts.map(font => (
-                <option key={font.value} value={font.value}>{font.name}</option>
-              ))}
-            </select>
-
-            {/* Font Size */}
-            <select
-              value={textFormat.fontSize}
-              onChange={(e) => applyFormatToSelection({ fontSize: parseInt(e.target.value) })}
-              className="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              {[12, 14, 16, 18, 20, 24, 28, 32, 36, 48].map(size => (
-                <option key={size} value={size}>{size}px</option>
-              ))}
-            </select>
-
-            <div className="w-px h-6 bg-gray-300 mx-1"></div>
-
-            {/* Text Formatting */}
-            <Button
-              variant={textFormat.bold ? "secondary" : "ghost"}
-              size="sm"
-              onClick={() => applyFormatToSelection({ bold: !textFormat.bold })}
-              className="h-9 w-9 p-0"
-              title="Bold"
-            >
-              <FaBold className="text-base" />
-            </Button>
-            <Button
-              variant={textFormat.italic ? "secondary" : "ghost"}
-              size="sm"
-              onClick={() => applyFormatToSelection({ italic: !textFormat.italic })}
-              className="h-9 w-9 p-0"
-              title="Italic"
-            >
-              <FaItalic className="text-base" />
-            </Button>
-            <Button
-              variant={textFormat.underline ? "secondary" : "ghost"}
-              size="sm"
-              onClick={() => applyFormatToSelection({ underline: !textFormat.underline })}
-              className="h-9 w-9 p-0"
-              title="Underline"
-            >
-              <FaUnderline className="text-base" />
-            </Button>
-            <Button
-              variant={textFormat.strikethrough ? "secondary" : "ghost"}
-              size="sm"
-              onClick={() => applyFormatToSelection({ strikethrough: !textFormat.strikethrough })}
-              className="h-9 w-9 p-0"
-              title="Strikethrough"
-            >
-              <FaStrikethrough className="text-base" />
-            </Button>
-
-            <div className="w-px h-6 bg-gray-300 mx-1"></div>
-
-            {/* Text Alignment */}
-            <Button
-              variant={textFormat.align === 'left' ? "secondary" : "ghost"}
-              size="sm"
-              onClick={() => applyFormatToSelection({ align: 'left' })}
-              className="h-9 w-9 p-0"
-              title="Align Left"
-            >
-              <FaAlignLeft className="text-base" />
-            </Button>
-            <Button
-              variant={textFormat.align === 'center' ? "secondary" : "ghost"}
-              size="sm"
-              onClick={() => applyFormatToSelection({ align: 'center' })}
-              className="h-9 w-9 p-0"
-              title="Align Center"
-            >
-              <FaAlignCenter className="text-base" />
-            </Button>
-            <Button
-              variant={textFormat.align === 'right' ? "secondary" : "ghost"}
-              size="sm"
-              onClick={() => applyFormatToSelection({ align: 'right' })}
-              className="h-9 w-9 p-0"
-              title="Align Right"
-            >
-              <FaAlignRight className="text-base" />
-            </Button>
-
-            <div className="w-px h-6 bg-gray-300 mx-1"></div>
-
-            {/* Lists */}
-            <Button
-              variant={textFormat.listType === 'bullet' ? "secondary" : "ghost"}
-              size="sm"
-              onClick={() => applyFormatToSelection({ listType: textFormat.listType === 'bullet' ? 'none' : 'bullet' })}
-              className="h-9 w-9 p-0"
-              title="Bullet List"
-            >
-              <FaListUl className="text-base" />
-            </Button>
-            <Button
-              variant={textFormat.listType === 'number' ? "secondary" : "ghost"}
-              size="sm"
-              onClick={() => applyFormatToSelection({ listType: textFormat.listType === 'number' ? 'none' : 'number' })}
-              className="h-9 w-9 p-0"
-              title="Numbered List"
-            >
-              <FaListOl className="text-base" />
-            </Button>
-
-            <div className="w-px h-6 bg-gray-300 mx-1"></div>
-
-            {/* Headings */}
-            <Button
-              variant={textFormat.headingLevel === 1 ? "secondary" : "ghost"}
-              size="sm"
-              onClick={() => applyFormatToSelection({ headingLevel: textFormat.headingLevel === 1 ? 0 : 1 })}
-              className="h-9 w-9 p-0 font-bold"
-              title="Heading 1"
-            >
-              H1
-            </Button>
-            <Button
-              variant={textFormat.headingLevel === 2 ? "secondary" : "ghost"}
-              size="sm"
-              onClick={() => applyFormatToSelection({ headingLevel: textFormat.headingLevel === 2 ? 0 : 2 })}
-              className="h-9 w-9 p-0 font-bold"
-              title="Heading 2"
-            >
-              H2
-            </Button>
-
-            <div className="w-px h-6 bg-gray-300 mx-1"></div>
-
-            {/* Color Picker */}
-            <div className="flex items-center gap-2">
-              <input
-                type="color"
-                value={textFormat.color}
-                onChange={(e) => applyFormatToSelection({ color: e.target.value })}
-                className="w-9 h-9 cursor-pointer rounded border border-gray-300"
-                title="Text Color"
-              />
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => applyFormatToSelection({ highlight: '#FEF3C7' })}
-                className="h-9 w-9 p-0"
-                title="Highlight"
-              >
-                <FaHighlighter className="text-base" />
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        {/* Mode Switcher */}
-        <div className="border-b border-gray-200 bg-white px-4 py-3">
-          <div className="flex items-center gap-2">
-            <Button
-              variant={mode === 'line' ? "secondary" : "ghost"}
-              size="sm"
-              onClick={() => setMode('line')}
-              className="gap-2 h-9"
-            >
-              <FaList className="text-base" />
-              Line Mode
-            </Button>
-            <Button
-              variant={mode === 'full' ? "secondary" : "ghost"}
-              size="sm"
-              onClick={() => setMode('full')}
-              className="gap-2 h-9"
-            >
-              <FaFileAlt className="text-base" />
-              Full Page
-            </Button>
-            
-            <div className="flex-1"></div>
-            
+          {/* Mode Switcher */}
+          <div className="border-b border-gray-200 bg-white px-4 py-3">
             <div className="flex items-center gap-2">
               <Button
-                variant="ghost"
+                variant={mode === 'line' ? "secondary" : "ghost"}
                 size="sm"
-                onClick={insertLink}
-                className="h-9 w-9 p-0"
-                title="Insert Link"
+                onClick={() => setMode('line')}
+                className="gap-2 h-9"
               >
-                <FaLink className="text-base" />
+                <FaList className="text-base" />
+                Line Mode
               </Button>
               <Button
-                variant="ghost"
+                variant={mode === 'full' ? "secondary" : "ghost"}
                 size="sm"
-                onClick={insertImage}
-                className="h-9 w-9 p-0"
-                title="Insert Image"
+                onClick={() => setMode('full')}
+                className="gap-2 h-9"
               >
-                <FaImage className="text-base" />
+                <FaFileAlt className="text-base" />
+                Full Page
               </Button>
-              <Button
-                size="sm"
-                onClick={addPage}
-                className="gap-2 h-9 bg-blue-600 hover:bg-blue-700 text-white"
-              >
-                <FaPlus className="text-base" />
-                New Page
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        {/* Content Area */}
-        <div className="flex-1 overflow-auto p-4 sm:p-6 bg-gradient-to-b from-white to-gray-50">
-          {mode === 'line' ? (
-            <div className="max-w-4xl mx-auto">
-              {currentLines.length > 0 ? (
-                <div className="space-y-2">
-                  {currentLines.map((line, index) => 
-                    renderLineWithFormat(line, currentFormats[index] || textFormat, index)
-                  )}
-                </div>
-              ) : (
-                <div className="text-center py-20 text-gray-500">
-                  <FaFileAlt className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-                  <p className="text-lg">No content yet</p>
-                  <p className="text-sm mt-1">Start writing by adding a line below</p>
-                </div>
-              )}
               
-              {/* Add Line Button */}
-              <div className="mt-6 flex justify-center">
+              <div className="flex-1"></div>
+              
+              <div className="flex items-center gap-2">
                 <Button
-                  onClick={addLine}
-                  variant="outline"
-                  className="gap-2 h-10 border-dashed border-gray-300 hover:border-blue-400 hover:bg-blue-50"
+                  variant="ghost"
+                  size="sm"
+                  onClick={insertLink}
+                  className="h-9 w-9 p-0"
+                  title="Insert Link"
+                >
+                  <FaLink className="text-base" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={insertImage}
+                  className="h-9 w-9 p-0"
+                  title="Insert Image"
+                >
+                  <FaImage className="text-base" />
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={addPage}
+                  className="gap-2 h-9 bg-blue-600 hover:bg-blue-700 text-white"
                 >
                   <FaPlus className="text-base" />
-                  Add New Line
+                  New Page
                 </Button>
               </div>
             </div>
-          ) : (
-            <FullPageEditor />
-          )}
-        </div>
+          </div>
 
-        {/* Footer */}
-        <div className="border-t border-gray-200 bg-white p-4">
-          <div className="flex items-center justify-between text-sm text-gray-600">
-            <div className="flex items-center gap-6">
-              <span className="font-medium">Lines: {currentLines.length}</span>
-              <span className="font-medium">Words: {currentLines.join(' ').split(/\s+/).filter(w => w.length > 0).length}</span>
-              <span className="font-medium">Characters: {currentLines.join('').length}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-700">
-                {isOnline ? 'Synced' : 'Working offline'} • Version {currentPage.version}
-              </span>
+          {/* Content Area */}
+          <div className="flex-1 overflow-auto p-4 sm:p-6 bg-gradient-to-b from-white to-gray-50">
+            {mode === 'line' ? (
+              <div className="max-w-4xl mx-auto">
+                {currentLines.length > 0 ? (
+                  <div className="space-y-2">
+                    {currentLines.map((line, index) => 
+                      renderLineWithFormat(line, currentFormats[index] || textFormat, index)
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-20 text-gray-500">
+                    <FaFileAlt className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+                    <p className="text-lg">No content yet</p>
+                    <p className="text-sm mt-1">Start writing by adding a line below</p>
+                  </div>
+                )}
+                
+                {/* Add Line Button */}
+                <div className="mt-6 flex justify-center">
+                  <Button
+                    onClick={addLine}
+                    variant="outline"
+                    className="gap-2 h-10 border-dashed border-gray-300 hover:border-blue-400 hover:bg-blue-50"
+                  >
+                    <FaPlus className="text-base" />
+                    Add New Line
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <FullPageEditor />
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="border-t border-gray-200 bg-white p-4">
+            <div className="flex items-center justify-between text-sm text-gray-600">
+              <div className="flex items-center gap-6">
+                <span className="font-medium">Lines: {currentLines.length}</span>
+                <span className="font-medium">Words: {currentLines.join(' ').split(/\s+/).filter(w => w.length > 0).length}</span>
+                <span className="font-medium">Characters: {currentLines.join('').length}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-700">
+                  {isOnline ? 'Synced' : 'Working offline'} • Version {currentPage.version}
+                </span>
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
+    )}
+   </>
   );
 }

@@ -36,10 +36,13 @@ import {
   FaUnderline,
   FaEye,
   FaEyeSlash,
-  FaDownload
+  FaDownload,
+  FaBars,
+  FaTimes
 } from 'react-icons/fa';
 import Konva from 'konva';
 import { usePersistentState } from '@/hooks/usePersistentState';
+import type { KonvaEventObject } from 'konva/lib/Node';
 
 interface LineData {
   points: number[];
@@ -154,6 +157,7 @@ export default function MicrosoftStyleCanvasBoard({ noteId }: { noteId: string }
   const [showToolbar, setShowToolbar] = useState(true);
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [showShapesMenu, setShowShapesMenu] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [gridSettings, setGridSettings] = useState<GridSettings>({
     enabled: false,
     size: 20,
@@ -193,7 +197,7 @@ export default function MicrosoftStyleCanvasBoard({ noteId }: { noteId: string }
     { type: 'star' as ShapeType, icon: <div className="text-lg">★</div>, label: 'Star' }
   ];
 
-  // Fonts array - FIXED: Added missing fonts array
+  // Fonts array
   const fonts = ['Arial', 'Helvetica', 'Times New Roman', 'Courier New', 'Verdana', 'Georgia', 'Comic Sans MS'];
 
   const currentLines = lines[pageIndex] || [];
@@ -301,21 +305,29 @@ export default function MicrosoftStyleCanvasBoard({ noteId }: { noteId: string }
     }
   };
 
-  // Handle mouse events
-  const handleMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
+  // Helper function to get pointer position from event
+  const getPointerPosition = (e: KonvaEventObject<MouseEvent> | KonvaEventObject<TouchEvent>) => {
     const stage = e.target.getStage();
-    if (!stage) return;
+    if (!stage) return null;
     
     const pointer = stage.getPointerPosition();
-    if (!pointer) return;
+    if (!pointer) return null;
     
-    const pos = {
+    return {
       x: (pointer.x - stage.x()) / stage.scaleX(),
       y: (pointer.y - stage.y()) / stage.scaleY(),
     };
+  };
+
+  // Mouse down handler
+  const handleMouseDown = (e: KonvaEventObject<MouseEvent>) => {
+    const stage = e.target.getStage();
+    if (!stage) return;
+    
+    const pos = getPointerPosition(e);
+    if (!pos) return;
 
     if (mode === 'select') {
-      // Clear selection if clicking on empty space
       if (e.target === stage) {
         setSelectedElement(null);
       }
@@ -327,7 +339,7 @@ export default function MicrosoftStyleCanvasBoard({ noteId }: { noteId: string }
       isDrawing.current = true;
       const newLine: LineData = {
         points: [pos.x, pos.y],
-        tool: mode, // This is now safe because mode is narrowed by the if condition
+        tool: mode,
         color: mode === 'eraser' ? '#ffffff' : penColor,
         size: penSize,
         opacity: mode === 'highlighter' ? highlighterOpacity : 1
@@ -377,19 +389,83 @@ export default function MicrosoftStyleCanvasBoard({ noteId }: { noteId: string }
     }
   };
 
-  const handleMouseMove = (e: Konva.KonvaEventObject<MouseEvent>) => {
-    if (!isDrawing.current && mode !== 'shape') return;
-    
+  // Touch down handler
+  const handleTouchStart = (e: KonvaEventObject<TouchEvent>) => {
+    e.evt.preventDefault(); // Prevent scrolling
     const stage = e.target.getStage();
     if (!stage) return;
     
-    const pointer = stage.getPointerPosition();
-    if (!pointer) return;
+    const pos = getPointerPosition(e);
+    if (!pos) return;
+
+    if (mode === 'select') {
+      if (e.target === stage) {
+        setSelectedElement(null);
+      }
+      return;
+    }
+
+    if (mode === 'pen' || mode === 'highlighter' || mode === 'eraser') {
+      pushHistory();
+      isDrawing.current = true;
+      const newLine: LineData = {
+        points: [pos.x, pos.y],
+        tool: mode,
+        color: mode === 'eraser' ? '#ffffff' : penColor,
+        size: penSize,
+        opacity: mode === 'highlighter' ? highlighterOpacity : 1
+      };
+      
+      const updated = [...lines];
+      updated[pageIndex] = [...currentLines, newLine];
+      setCanvasData(prev => ({ ...prev, lines: updated }));
+    } else if (mode === 'shape') {
+      shapeStart.current = { x: pos.x, y: pos.y };
+    } else if (mode === 'text') {
+      pushHistory();
+      const newTextBox: TextBoxData = {
+        x: pos.x,
+        y: pos.y,
+        text: 'Click to type...',
+        id: Date.now().toString(),
+        fontSize: selectedFontSize,
+        fontFamily: selectedFont,
+        fill: penColor,
+        align: textAlign,
+        bold: textBold,
+        italic: textItalic,
+        underline: textUnderline,
+        width: 200,
+        isEditing: true
+      };
+      
+      const updated = [...textBoxes];
+      updated[pageIndex] = [...currentTextBoxes, newTextBox];
+      setCanvasData(prev => ({ ...prev, textBoxes: updated }));
+    } else if (mode === 'sticky') {
+      pushHistory();
+      const newSticky: StickyNoteData = {
+        x: pos.x,
+        y: pos.y,
+        text: 'Double click to edit',
+        id: Date.now().toString(),
+        color: colors[Math.floor(Math.random() * 5) + 10],
+        width: 200,
+        height: 150
+      };
+      
+      const updated = [...stickyNotes];
+      updated[pageIndex] = [...currentStickyNotes, newSticky];
+      setCanvasData(prev => ({ ...prev, stickyNotes: updated }));
+    }
+  };
+
+  // Mouse move handler
+  const handleMouseMove = (e: KonvaEventObject<MouseEvent>) => {
+    if (!isDrawing.current && mode !== 'shape') return;
     
-    const pos = {
-      x: (pointer.x - stage.x()) / stage.scaleX(),
-      y: (pointer.y - stage.y()) / stage.scaleY(),
-    };
+    const pos = getPointerPosition(e);
+    if (!pos) return;
 
     if (isDrawing.current && (mode === 'pen' || mode === 'highlighter' || mode === 'eraser')) {
       const updated = [...lines];
@@ -409,8 +485,7 @@ export default function MicrosoftStyleCanvasBoard({ noteId }: { noteId: string }
       const width = Math.abs(pos.x - start.x);
       const height = Math.abs(pos.y - start.y);
 
-      // FIXED: Removed the 'highlighter' check since mode can't be 'highlighter' here
-      const fill = '#ffffff00'; // Transparent fill for shape preview
+      const fill = '#ffffff00';
       
       setPreviewShape({
         type: selectedShape,
@@ -427,6 +502,50 @@ export default function MicrosoftStyleCanvasBoard({ noteId }: { noteId: string }
     }
   };
 
+  // Touch move handler
+  const handleTouchMove = (e: KonvaEventObject<TouchEvent>) => {
+    e.evt.preventDefault(); // Prevent scrolling
+    if (!isDrawing.current && mode !== 'shape') return;
+    
+    const pos = getPointerPosition(e);
+    if (!pos) return;
+
+    if (isDrawing.current && (mode === 'pen' || mode === 'highlighter' || mode === 'eraser')) {
+      const updated = [...lines];
+      const current = [...currentLines];
+      
+      if (current.length === 0) return;
+      
+      const lastLine = { ...current[current.length - 1] };
+      lastLine.points = [...lastLine.points, pos.x, pos.y];
+      current[current.length - 1] = lastLine;
+      updated[pageIndex] = current;
+      setCanvasData(prev => ({ ...prev, lines: updated }));
+    } else if (mode === 'shape' && shapeStart.current) {
+      const start = shapeStart.current;
+      const x = Math.min(start.x, pos.x);
+      const y = Math.min(start.y, pos.y);
+      const width = Math.abs(pos.x - start.x);
+      const height = Math.abs(pos.y - start.y);
+
+      const fill = '#ffffff00';
+      
+      setPreviewShape({
+        type: selectedShape,
+        x,
+        y,
+        width,
+        height,
+        id: 'preview',
+        fill: fill,
+        stroke: penColor,
+        strokeWidth: 2,
+        rotation: 0
+      });
+    }
+  };
+
+  // Mouse up handler
   const handleMouseUp = () => {
     isDrawing.current = false;
     
@@ -435,7 +554,7 @@ export default function MicrosoftStyleCanvasBoard({ noteId }: { noteId: string }
       const newShape: ShapeData = {
         ...previewShape,
         id: Date.now().toString(),
-        fill: '#ffffff00' // Transparent fill by default
+        fill: '#ffffff00'
       };
       
       const updated = [...shapes];
@@ -446,7 +565,27 @@ export default function MicrosoftStyleCanvasBoard({ noteId }: { noteId: string }
     }
   };
 
-  const handleWheel = (e: Konva.KonvaEventObject<WheelEvent>) => {
+  // Touch up handler
+  const handleTouchEnd = () => {
+    isDrawing.current = false;
+    
+    if (mode === 'shape' && shapeStart.current && previewShape) {
+      pushHistory();
+      const newShape: ShapeData = {
+        ...previewShape,
+        id: Date.now().toString(),
+        fill: '#ffffff00'
+      };
+      
+      const updated = [...shapes];
+      updated[pageIndex] = [...currentShapes, newShape];
+      setCanvasData(prev => ({ ...prev, shapes: updated }));
+      shapeStart.current = null;
+      setPreviewShape(null);
+    }
+  };
+
+  const handleWheel = (e: KonvaEventObject<WheelEvent>) => {
     e.evt.preventDefault();
     const stage = stageRef.current;
     
@@ -458,7 +597,6 @@ export default function MicrosoftStyleCanvasBoard({ noteId }: { noteId: string }
     const isCtrlPressed = e.evt.ctrlKey || e.evt.metaKey;
     
     if (isCtrlPressed) {
-      // Zoom
       const scaleBy = 1.1;
       const oldScale = scale;
       const direction = e.evt.deltaY > 0 ? -1 : 1;
@@ -479,7 +617,6 @@ export default function MicrosoftStyleCanvasBoard({ noteId }: { noteId: string }
       setScale(newScale);
       setStagePos(newPos);
     } else {
-      // Pan
       const dx = e.evt.deltaX;
       const dy = e.evt.deltaY;
       
@@ -614,57 +751,84 @@ export default function MicrosoftStyleCanvasBoard({ noteId }: { noteId: string }
     { mode: 'sticky' as ToolMode, icon: <div className="text-lg">📝</div>, label: 'Sticky' }
   ];
 
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
-      {/* Top Header - Microsoft Whiteboard Style */}
-      <div className="flex items-center justify-between px-4 py-2 bg-white border-b border-gray-200 shadow-sm">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center">
-              <span className="text-white font-bold">NV</span>
+    <div className="h-screen flex flex-col bg-gray-50 overflow-hidden">
+      {/* Responsive Header */}
+      <div className="flex items-center justify-between px-2 sm:px-4 py-2 bg-white border-b border-gray-200 shadow-sm">
+        <div className="flex items-center gap-2 sm:gap-4">
+          {/* Mobile Menu Toggle */}
+          <button
+            onClick={() => setShowMobileMenu(!showMobileMenu)}
+            className="md:hidden p-2 hover:bg-gray-100 rounded-lg"
+          >
+            {showMobileMenu ? <FaTimes /> : <FaBars />}
+          </button>
+
+          <div className="flex items-center gap-1 sm:gap-2">
+            <div className="w-6 h-6 sm:w-8 sm:h-8 bg-blue-600 rounded flex items-center justify-center">
+              <span className="text-white font-bold text-xs sm:text-sm">NV</span>
             </div>
-            <span className="font-semibold text-gray-800">NoteVerse Whiteboard</span>
+            <span className="font-semibold text-gray-800 text-sm sm:text-base hidden xs:inline">NoteVerse</span>
           </div>
           
-          <div className="flex items-center gap-2">
+          {/* Desktop Undo/Redo */}
+          <div className="hidden md:flex items-center gap-2">
             <Button
               variant="ghost"
               size="sm"
               onClick={undo}
               disabled={historyIndex <= 0}
-              className="gap-2 hover:bg-gray-100"
+              className="gap-1 hover:bg-gray-100"
             >
-              <FaUndo className="text-sm" />
-              <span className="hidden md:inline">Undo</span>
+              <FaUndo className="text-xs sm:text-sm" />
+              <span className="hidden lg:inline">Undo</span>
             </Button>
             <Button
               variant="ghost"
               size="sm"
               onClick={redo}
               disabled={historyIndex >= history.length - 1}
-              className="gap-2 hover:bg-gray-100"
+              className="gap-1 hover:bg-gray-100"
             >
-              <FaRedo className="text-sm" />
-              <span className="hidden md:inline">Redo</span>
-            </Button>
-            
-            <div className="w-px h-6 bg-gray-300 mx-2"></div>
-            
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={clearPage}
-              className="gap-2 hover:bg-gray-100"
-            >
-              <FaTrash className="text-sm" />
-              <span className="hidden md:inline">Clear</span>
+              <FaRedo className="text-xs sm:text-sm" />
+              <span className="hidden lg:inline">Redo</span>
             </Button>
           </div>
         </div>
         
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 bg-gray-100 rounded-lg px-3 py-1">
-            <span className="text-sm text-gray-600">Page {pageIndex + 1} of {lines.length}</span>
+        <div className="flex items-center gap-2 sm:gap-4">
+          {/* Mobile Quick Actions */}
+          <div className="flex md:hidden items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={undo}
+              disabled={historyIndex <= 0}
+              className="h-8 w-8 p-0"
+            >
+              <FaUndo className="text-xs" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={redo}
+              disabled={historyIndex >= history.length - 1}
+              className="h-8 w-8 p-0"
+            >
+              <FaRedo className="text-xs" />
+            </Button>
+          </div>
+
+          {/* Page Navigation - Responsive */}
+          <div className="flex items-center gap-1 sm:gap-2 bg-gray-100 rounded-lg px-2 sm:px-3 py-1">
+            <span className="text-xs sm:text-sm text-gray-600 hidden xs:inline">
+              Page {pageIndex + 1}/{lines.length}
+            </span>
+            <span className="text-xs sm:text-sm text-gray-600 xs:hidden">
+              {pageIndex + 1}/{lines.length}
+            </span>
             <div className="flex gap-1">
               <Button
                 variant="ghost"
@@ -695,11 +859,13 @@ export default function MicrosoftStyleCanvasBoard({ noteId }: { noteId: string }
             </Button>
           </div>
           
-          <Button variant="primary" size="sm" onClick={exportCanvas} className="gap-2">
-            <FaDownload className="text-sm" />
-            <span>Export</span>
+          {/* Export Button - Hidden on mobile, shown in mobile menu */}
+          <Button variant="primary" size="sm" onClick={exportCanvas} className="hidden sm:flex gap-2">
+            <FaDownload className="text-xs sm:text-sm" />
+            <span className="hidden md:inline">Export</span>
           </Button>
           
+          {/* Toolbar Toggle */}
           <Button
             variant="ghost"
             size="sm"
@@ -794,7 +960,7 @@ export default function MicrosoftStyleCanvasBoard({ noteId }: { noteId: string }
                       max={30}
                       value={penSize}
                       onChange={(e) => setPenSize(Number(e.target.value))}
-                      className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-blue-600"
+                      className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer"
                     />
                   </div>
                   
@@ -810,7 +976,7 @@ export default function MicrosoftStyleCanvasBoard({ noteId }: { noteId: string }
                         step={0.1}
                         value={highlighterOpacity}
                         onChange={(e) => setHighlighterOpacity(Number(e.target.value))}
-                        className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-blue-600"
+                        className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer"
                       />
                     </div>
                   )}
@@ -856,9 +1022,7 @@ export default function MicrosoftStyleCanvasBoard({ noteId }: { noteId: string }
                       className="w-full p-2 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     >
                       {fonts.map((font: string) => (
-                        <option key={font} value={font}>
-                          {font}
-                        </option>
+                        <option key={font} value={font}>{font}</option>
                       ))}
                     </select>
                   </div>
@@ -873,7 +1037,7 @@ export default function MicrosoftStyleCanvasBoard({ noteId }: { noteId: string }
                       max={72}
                       value={selectedFontSize}
                       onChange={(e) => setSelectedFontSize(Number(e.target.value))}
-                      className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-blue-600"
+                      className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer"
                     />
                   </div>
 
@@ -988,14 +1152,15 @@ export default function MicrosoftStyleCanvasBoard({ noteId }: { noteId: string }
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowToolbar(!showToolbar)}
-                className="h-8 w-8 p-0"
+                className="hidden md:flex h-8 w-8 p-0"
                 title={showToolbar ? "Hide toolbar" : "Show toolbar"}
               >
                 {showToolbar ? <FaCompress className="text-sm" /> : <FaExpand className="text-sm" />}
               </Button>
               
-              <div className="w-px h-6 bg-gray-300 mx-1"></div>
+              <div className="w-px h-6 bg-gray-300 mx-1 hidden md:block"></div>
               
+              {/* Undo/Redo */}
               <Button
                 variant="ghost"
                 size="sm"
@@ -1018,18 +1183,20 @@ export default function MicrosoftStyleCanvasBoard({ noteId }: { noteId: string }
                 <FaRedo className="text-sm" />
               </Button>
               
+              {/* Clear - Hidden on very small screens */}
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={clearPage}
-                className="h-8 w-8 p-0"
+                className="hidden xs:flex h-8 w-8 p-0"
                 title="Clear page"
               >
                 <FaTrash className="text-sm" />
               </Button>
               
-              <div className="w-px h-6 bg-gray-300 mx-1"></div>
+              <div className="w-px h-6 bg-gray-300 mx-1 hidden xs:block"></div>
               
+              {/* Zoom Reset */}
               <Button
                 variant="ghost"
                 size="sm"
@@ -1058,9 +1225,13 @@ export default function MicrosoftStyleCanvasBoard({ noteId }: { noteId: string }
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
             style={{ 
               cursor,
-              backgroundColor: background
+              backgroundColor: background,
+              touchAction: 'none'
             }}
             className="bg-white"
           >
@@ -1230,35 +1401,35 @@ export default function MicrosoftStyleCanvasBoard({ noteId }: { noteId: string }
             </Layer>
           </Stage>
 
-          {/* Zoom Controls */}
-          <div className="absolute bottom-4 right-4 z-10">
-            <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-2">
-              <div className="flex items-center gap-3">
+          {/* Zoom Controls - Responsive */}
+          <div className="absolute bottom-2 right-2 sm:bottom-4 sm:right-4 z-10">
+            <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-1 sm:p-2">
+              <div className="flex items-center gap-2 sm:gap-3">
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => setScale(prev => Math.max(0.1, prev / 1.2))}
-                  className="h-8 w-8 p-0"
+                  className="h-6 w-6 sm:h-8 sm:w-8 p-0"
                   title="Zoom out"
                 >
-                  <FaMinus />
+                  <FaMinus className="text-xs sm:text-sm" />
                 </Button>
                 
-                <div className="text-center min-w-[70px]">
-                  <div className="text-sm font-medium text-gray-700">
+                <div className="text-center min-w-[40px] sm:min-w-[70px]">
+                  <div className="text-xs sm:text-sm font-medium text-gray-700">
                     {Math.round(scale * 100)}%
                   </div>
-                  <div className="text-xs text-gray-500">Zoom</div>
+                  <div className="text-[10px] sm:text-xs text-gray-500 hidden xs:block">Zoom</div>
                 </div>
                 
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => setScale(prev => Math.min(5, prev * 1.2))}
-                  className="h-8 w-8 p-0"
+                  className="h-6 w-6 sm:h-8 sm:w-8 p-0"
                   title="Zoom in"
                 >
-                  <FaPlus />
+                  <FaPlus className="text-xs sm:text-sm" />
                 </Button>
               </div>
             </div>
