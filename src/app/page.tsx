@@ -503,7 +503,7 @@ export default function Home() {
               </span>
             </h2>
             <p className="text-sm sm:text-base lg:text-lg text-gray-600 max-w-3xl mx-auto px-4">
-              From simple notes to complex diagrams, we've got you covered
+              From simple notes to complex diagrams, we&apos;ve got you covered
             </p>
           </motion.div>
           
