@@ -98,29 +98,43 @@ const NoteSelector: React.FC = () => {
         }
     };
 
-    const handleDelete = (id: string) => {
-        const noteToDelete = notes.find((n) => n.id === id);
-        if (!noteToDelete) return;
-        
-        setActionInProgress(id);
-        setIsDeleting(true);
+    const handleDelete = async (id: string) => {
+    if (actionInProgress) return;
 
-        const updatedNotes = notes.filter((n) => n.id !== id);
-        setNotes(updatedNotes);
+    setActionInProgress(id);
+    setIsDeleting(true);
 
-        const existingBin = JSON.parse(localStorage.getItem(BIN_STORAGE_KEY) || "[]");
-        const updatedBin = [{ ...noteToDelete, isDeleted: true, updatedAt: new Date().toISOString() }, ...existingBin];
-        localStorage.setItem(BIN_STORAGE_KEY, JSON.stringify(updatedBin));
+    try {
+        const res = await fetch(`/api/notes/${id}/delete`, {
+            method: "DELETE",
+        });
+
+        if (!res.ok) {
+            throw new Error("Failed to delete");
+        }
+
+        // Remove from UI immediately
+        setNotes(prev => prev.filter(n => n.id !== id));
 
         registerChange(id);
         setOpenMenuId(null);
-        toast.success({ title: "Moved to bin", description: "You can restore it anytime from Bin." });
 
-        setTimeout(() => {
-            setIsDeleting(false);
-            setActionInProgress(null);
-        }, 100);
-    };
+        toast.success({
+            title: "Moved to bin",
+            description: "You can restore it anytime from Bin."
+        });
+
+    } catch (err) {
+        console.error("Delete failed:", err);
+        toast.error({
+            title: "Delete failed",
+            description: "Could not move note to bin."
+        });
+    } finally {
+        setIsDeleting(false);
+        setActionInProgress(null);
+    }
+};
 
     const createNote = async () => {
         if (!selectedNoteType || !newNoteTitle.trim()) {

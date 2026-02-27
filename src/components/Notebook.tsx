@@ -124,42 +124,53 @@ const syncToServer = (newPages: PageContent[]) => {
 
 /* ---------------- LOAD NOTE CONTENT FROM DATABASE ---------------- */
 useEffect(() => {
-  if (!noteId || hasLoadedFromServer.current) return;
+  if (!noteId) return;
 
   const loadFromServer = async () => {
     try {
       const res = await fetch(`/api/notes/${noteId}/content`);
-      const json = await res.json();
+      console.log("STATUS:", res.status);
 
+      if (!res.ok) {
+        console.error("Failed to load note");
+        return;
+      }
+
+      const json = await res.json();
       console.log("LOADED FROM API:", json);
 
       if (json?.type === "notebook" && json?.data?.ops) {
 
-        const text = json.data.ops.map((op:any)=>op.insert || "").join("");
-        const lines = text.split("\n");
+        const fullText = json.data.ops
+          .map((op: any) => op.insert || "")
+          .join("");
 
-        const newPage: PageContent = {
+        const lines = fullText.split("\n");
+
+        const newPage = {
           id: Date.now().toString(),
           lines: lines.length ? lines : [""],
-          format: lines.map(()=>({...textFormat})),
+          format: lines.length
+            ? lines.map(() => ({ ...textFormat }))
+            : [{ ...textFormat }],
           version: 1,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         };
 
         setPages([newPage]);
-        hasLoadedFromServer.current = true;   // 🚀 IMPORTANT
       }
 
-    } catch (e) {
-      console.error("LOAD NOTE FAILED", e);
+    } catch (err) {
+      console.error("LOAD NOTE FAILED", err);
     } finally {
       setLoadingFromServer(false);
     }
   };
 
   loadFromServer();
-}, [noteId, setPages, textFormat]);
+
+}, [noteId]);   // ⚠ REMOVE textFormat & setPages from deps
 
   const lineInputRefs = useRef<(HTMLTextAreaElement | null)[]>([]);
   const fullTextRef = useRef<HTMLTextAreaElement>(null);
