@@ -28,8 +28,10 @@ import {
   FaExpand,
   FaCompress,
   FaCopy,
-  FaTrash
+  FaTrash,
+  FaShare
 } from 'react-icons/fa';
+import SharingPanel from '@/components/SharingPanel';
 
 interface TextFormat {
   bold: boolean;
@@ -54,7 +56,13 @@ interface PageContent {
   updatedAt: string;
 }
 
-export default function Notebook({ noteId }: { noteId: string }) {
+export default function Notebook({ 
+  noteId, 
+  isReadOnly = false 
+}: { 
+  noteId: string;
+  isReadOnly?: boolean;
+}) {
   const storageKey = `notebook-advanced-${noteId}`;
   const [pageIndex, setPageIndex] = useState(0);
   const [mode, setMode] = useState<'line' | 'full'>('line');
@@ -73,6 +81,9 @@ export default function Notebook({ noteId }: { noteId: string }) {
     headingLevel: 0
   });
 
+  const [showShare, setShowShare] = useState(false);
+  const [isReadOnlyMode, setIsReadOnlyMode] = useState(false);
+
   const { data: session } = useSession();
 
   const saveToServer = React.useRef<NodeJS.Timeout | null>(null);
@@ -81,6 +92,7 @@ export default function Notebook({ noteId }: { noteId: string }) {
 
 const syncToServer = (newPages: PageContent[]) => {
   if (!session?.user?.id) return;
+  if (isReadOnlyMode || isReadOnly) return;
 
   if (saveToServer.current) clearTimeout(saveToServer.current);
 
@@ -97,7 +109,7 @@ const syncToServer = (newPages: PageContent[]) => {
           userId: session.user.id,
           updatedAt: new Date().toISOString(),
           data: {
-            ops: [{ insert: text || "\n" }]   // ⭐ CRITICAL FIX
+            ops: [{ insert: text || "\n" }]
           }
         })
       });
@@ -139,6 +151,11 @@ useEffect(() => {
       const json = await res.json();
       console.log("LOADED FROM API:", json);
 
+      // Check if this is a read-only note (imported or public)
+      if (json.readOnly || json.isImported || json.permission === 'view') {
+        setIsReadOnlyMode(true);
+      }
+
       if (json?.type === "notebook" && json?.data?.ops) {
 
         const fullText = json.data.ops
@@ -170,7 +187,7 @@ useEffect(() => {
 
   loadFromServer();
 
-}, [noteId]);   // ⚠ REMOVE textFormat & setPages from deps
+}, [noteId]);
 
   const lineInputRefs = useRef<(HTMLTextAreaElement | null)[]>([]);
   const fullTextRef = useRef<HTMLTextAreaElement>(null);
@@ -194,6 +211,8 @@ const currentPage = pages[pageIndex] || { lines: [''], format: [textFormat] };
 
   const currentLines = currentPage.lines || [''];
   const currentFormats = currentPage.format || [textFormat];
+  
+  const finalReadOnly = isReadOnly || isReadOnlyMode;
 
   // Check online status
   useEffect(() => {
@@ -224,20 +243,21 @@ const currentPage = pages[pageIndex] || { lines: [''], format: [textFormat] };
 
   // History helper
   const pushHistory = useCallback(() => {
+    if (finalReadOnly) return;
     const newHistory = [...history.slice(0, historyIndex + 1), JSON.parse(JSON.stringify(pages))];
     setHistory(newHistory);
     setHistoryIndex(newHistory.length - 1);
-  }, [history, historyIndex, pages]);
+  }, [history, historyIndex, pages, finalReadOnly]);
 
   // Initialize history
   useEffect(() => {
-    if (history.length === 0) {
+    if (history.length === 0 && !finalReadOnly) {
       pushHistory();
     }
-    // depend on history.length and pushHistory to satisfy exhaustive-deps
-  }, [history.length, pushHistory]);
+  }, [history.length, pushHistory, finalReadOnly]);
 
   const undo = () => {
+    if (finalReadOnly) return;
     if (historyIndex > 0) {
       setHistoryIndex(historyIndex - 1);
       setPages(history[historyIndex - 1]);
@@ -245,6 +265,7 @@ const currentPage = pages[pageIndex] || { lines: [''], format: [textFormat] };
   };
 
   const redo = () => {
+    if (finalReadOnly) return;
     if (historyIndex < history.length - 1) {
       setHistoryIndex(historyIndex + 1);
       setPages(history[historyIndex + 1]);
@@ -252,6 +273,7 @@ const currentPage = pages[pageIndex] || { lines: [''], format: [textFormat] };
   };
 
   const applyFormatToLine = (lineIndex: number, format: Partial<TextFormat>) => {
+    if (finalReadOnly) return;
     pushHistory();
     const updatedPages = [...pages];
     const updatedFormats = [...updatedPages[pageIndex].format];
@@ -274,6 +296,7 @@ const currentPage = pages[pageIndex] || { lines: [''], format: [textFormat] };
   };
 
   const applyFormatToSelection = (format: Partial<TextFormat>) => {
+    if (finalReadOnly) return;
     if (selectedLineIndex !== null) {
       applyFormatToLine(selectedLineIndex, format);
     } else {
@@ -282,6 +305,7 @@ const currentPage = pages[pageIndex] || { lines: [''], format: [textFormat] };
   };
 
   const handleLineChange = (lineIndex: number, text: string) => {
+    if (finalReadOnly) return;
     pushHistory();
     const updatedPages = [...pages];
     const updatedLines = [...updatedPages[pageIndex].lines];
@@ -305,6 +329,7 @@ const currentPage = pages[pageIndex] || { lines: [''], format: [textFormat] };
   };
 
   const addLine = () => {
+    if (finalReadOnly) return;
     pushHistory();
     const updatedPages = [...pages];
     const updatedLines = [...updatedPages[pageIndex].lines, ''];
@@ -331,6 +356,7 @@ const currentPage = pages[pageIndex] || { lines: [''], format: [textFormat] };
   };
 
   const deleteLine = (index: number) => {
+    if (finalReadOnly) return;
     if (currentLines.length <= 1) return;
     pushHistory();
     const updatedPages = [...pages];
@@ -354,6 +380,7 @@ const currentPage = pages[pageIndex] || { lines: [''], format: [textFormat] };
   };
 
   const addPage = () => {
+    if (finalReadOnly) return;
     pushHistory();
     const newPage: PageContent = {
       id: Date.now().toString(),
@@ -395,7 +422,6 @@ const currentPage = pages[pageIndex] || { lines: [''], format: [textFormat] };
           toast.error({ title: "Copy failed", description: "Clipboard write failed." });
         });
     } else {
-      // Fallback for older browsers
       try {
         const textarea = document.createElement('textarea');
         textarea.value = content;
@@ -414,6 +440,7 @@ const currentPage = pages[pageIndex] || { lines: [''], format: [textFormat] };
   };
 
   const insertImage = () => {
+    if (finalReadOnly) return;
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
@@ -427,8 +454,6 @@ const currentPage = pages[pageIndex] || { lines: [''], format: [textFormat] };
           const idx = pages[pageIndex]?.lines?.length ?? currentLines.length;
           handleLineChange(idx, `![Image](${imageUrl})`);
           addLine();
-          // Ensure the newly inserted line is visible and focused in Line mode,
-          // or focus the full page editor when in Full mode.
           setTimeout(() => {
             if (mode === 'line') {
               setSelectedLineIndex(idx);
@@ -440,7 +465,6 @@ const currentPage = pages[pageIndex] || { lines: [''], format: [textFormat] };
             } else {
               if (fullTextRef.current) {
                 fullTextRef.current.focus();
-                // place caret at end
                 const val = fullTextRef.current.value;
                 fullTextRef.current.selectionStart = fullTextRef.current.selectionEnd = val.length;
                 fullTextRef.current.scrollTop = fullTextRef.current.scrollHeight;
@@ -451,22 +475,20 @@ const currentPage = pages[pageIndex] || { lines: [''], format: [textFormat] };
         };
         reader.readAsDataURL(file);
       }
-      // cleanup
       if (input.parentNode) input.parentNode.removeChild(input);
     };
-    // append to DOM then click to allow mobile browsers to allow the file picker
     document.body.appendChild(input);
     input.click();
   };
 
   const insertLink = () => {
+    if (finalReadOnly) return;
     const url = prompt('Enter URL:');
     const text = prompt('Enter link text:') || url;
     if (url) {
       const idx = pages[pageIndex]?.lines?.length ?? currentLines.length;
       handleLineChange(idx, `[${text}](${url})`);
       addLine();
-      // Focus the inserted content similar to insertImage
       setTimeout(() => {
         if (mode === 'line') {
           setSelectedLineIndex(idx);
@@ -503,11 +525,10 @@ const currentPage = pages[pageIndex] || { lines: [''], format: [textFormat] };
       resize: 'none',
       overflow: 'hidden',
       minHeight: '40px',
-      direction: 'ltr', // Force LTR direction
-      unicodeBidi: 'isolate' // Prevent bidirectional text issues
+      direction: 'ltr',
+      unicodeBidi: 'isolate'
     };
 
-    // Add prefix based on formatting
     let displayText = line;
     let prefix = '';
     
@@ -524,71 +545,76 @@ const currentPage = pages[pageIndex] || { lines: [''], format: [textFormat] };
         key={index}
         className="group relative flex items-start gap-3"
       >
-        {/* Line number (hidden on very small screens) */}
         <div className="hidden sm:block w-8 flex-shrink-0 pt-3 text-right">
           <span className="text-xs font-mono text-gray-400 select-none">
             {index + 1}
           </span>
         </div>
 
-        {/* Text area with proper LTR direction */}
         <div className="flex-1 relative">
-          <textarea
-            ref={(el) => { 
-              lineInputRefs.current[index] = el;
-              // Auto-resize on mount
-              if (el) {
-                el.style.height = 'auto';
-                el.style.height = el.scrollHeight + 'px';
-              }
-            }}
-            value={displayText}
-            onChange={(e) => {
-              let newText = e.target.value;
-              // Remove prefix if present
-              if (prefix && newText.startsWith(prefix)) {
-                newText = newText.substring(prefix.length);
-              }
-              handleLineChange(index, newText);
-            }}
-            style={textareaStyle}
-            className={`w-full bg-transparent border border-transparent focus:border-blue-300 rounded px-3 py-2 outline-none transition-all cursor-text whitespace-pre-wrap ${
-              selectedLineIndex === index ? 'bg-blue-50 border-blue-200' : 'hover:bg-gray-50'
-            }`}
-            onFocus={() => setSelectedLineIndex(index)}
-            onClick={() => setSelectedLineIndex(index)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                addLine();
-              }
-              if (e.key === 'Tab') {
-                e.preventDefault();
-                const start = e.currentTarget.selectionStart;
-                const end = e.currentTarget.selectionEnd;
-                const newText = line.substring(0, start) + '\t' + line.substring(end);
+          {finalReadOnly ? (
+            <div 
+              className={`w-full px-3 py-2 min-h-[40px] whitespace-pre-wrap ${selectedLineIndex === index ? 'bg-blue-50' : ''}`}
+              style={textareaStyle}
+            >
+              {displayText}
+            </div>
+          ) : (
+            <textarea
+              ref={(el) => { 
+                lineInputRefs.current[index] = el;
+                if (el) {
+                  el.style.height = 'auto';
+                  el.style.height = el.scrollHeight + 'px';
+                }
+              }}
+              value={displayText}
+              onChange={(e) => {
+                let newText = e.target.value;
+                if (prefix && newText.startsWith(prefix)) {
+                  newText = newText.substring(prefix.length);
+                }
                 handleLineChange(index, newText);
-                setTimeout(() => {
-                  e.currentTarget.selectionStart = e.currentTarget.selectionEnd = start + 1;
-                }, 0);
-              }
-              if (e.key === 'Backspace' && line === '' && currentLines.length > 1) {
-                e.preventDefault();
-                deleteLine(index);
-              }
-            }}
-            onInput={(e) => {
-              const target = e.target as HTMLTextAreaElement;
-              target.style.height = 'auto';
-              target.style.height = target.scrollHeight + 'px';
-            }}
-            dir="ltr" // Force left-to-right direction
-            spellCheck={true}
-            data-index={index}
-          />
+              }}
+              style={textareaStyle}
+              className={`w-full bg-transparent border border-transparent focus:border-blue-300 rounded px-3 py-2 outline-none transition-all cursor-text whitespace-pre-wrap ${
+                selectedLineIndex === index ? 'bg-blue-50 border-blue-200' : 'hover:bg-gray-50'
+              }`}
+              onFocus={() => setSelectedLineIndex(index)}
+              onClick={() => setSelectedLineIndex(index)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  addLine();
+                }
+                if (e.key === 'Tab') {
+                  e.preventDefault();
+                  const start = e.currentTarget.selectionStart;
+                  const end = e.currentTarget.selectionEnd;
+                  const newText = line.substring(0, start) + '\t' + line.substring(end);
+                  handleLineChange(index, newText);
+                  setTimeout(() => {
+                    e.currentTarget.selectionStart = e.currentTarget.selectionEnd = start + 1;
+                  }, 0);
+                }
+                if (e.key === 'Backspace' && line === '' && currentLines.length > 1) {
+                  e.preventDefault();
+                  deleteLine(index);
+                }
+              }}
+              onInput={(e) => {
+                const target = e.target as HTMLTextAreaElement;
+                target.style.height = 'auto';
+                target.style.height = target.scrollHeight + 'px';
+              }}
+              dir="ltr"
+              spellCheck={true}
+              data-index={index}
+              disabled={finalReadOnly}
+            />
+          )}
           
-          {/* Delete button */}
-          {selectedLineIndex === index && (
+          {!finalReadOnly && selectedLineIndex === index && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -601,31 +627,6 @@ const currentPage = pages[pageIndex] || { lines: [''], format: [textFormat] };
             </button>
           )}
         </div>
-        {/* Render markdown previews for image / link */}
-        {line && (() => {
-          const imgMatch = line.match(/^!\[[^\]]*\]\(([^)]+)\)/);
-          if (imgMatch) {
-            const src = imgMatch[1];
-            return (
-              <div className="mt-2">
-                <img src={src} alt="inserted" className="max-w-full rounded shadow-sm" />
-              </div>
-            );
-          }
-
-          const linkMatch = line.match(/^\[([^\]]+)\]\(([^)]+)\)/);
-          if (linkMatch) {
-            const text = linkMatch[1];
-            const href = linkMatch[2];
-            return (
-              <div className="mt-2">
-                <a href={href} className="text-blue-600 underline" target="_blank" rel="noreferrer">{text}</a>
-              </div>
-            );
-          }
-
-          return null;
-        })()}
       </div>
     );
   };
@@ -633,6 +634,7 @@ const currentPage = pages[pageIndex] || { lines: [''], format: [textFormat] };
   // Full page editor component
   const FullPageEditor = () => {
     const handleFullTextChange = (text: string) => {
+      if (finalReadOnly) return;
       pushHistory();
       const updatedPages = [...pages];
       const lines = text.split('\n');
@@ -663,22 +665,31 @@ const currentPage = pages[pageIndex] || { lines: [''], format: [textFormat] };
 
     return (
       <div className="max-w-4xl mx-auto px-2 sm:px-6">
-        <textarea
-          ref={fullTextRef}
-          value={currentLines.join('\n')}
-          onChange={(e) => handleFullTextChange(e.target.value)}
-          style={fullTextStyle}
-          className="w-full min-h-[400px] p-6 bg-white border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 leading-relaxed resize-none"
-          onInput={(e) => {
-            const target = e.target as HTMLTextAreaElement;
-            target.style.height = 'auto';
-            target.style.height = target.scrollHeight + 'px';
-          }}
-          dir="ltr"
-          spellCheck={true}
-          placeholder="Start writing your thoughts here..."
-        />
-        {/* Full-page preview for rendered markdown (images/links) */}
+        {finalReadOnly ? (
+          <div 
+            className="w-full min-h-[400px] p-6 bg-white border border-gray-200 rounded-lg leading-relaxed whitespace-pre-wrap"
+            style={fullTextStyle}
+          >
+            {currentLines.join('\n')}
+          </div>
+        ) : (
+          <textarea
+            ref={fullTextRef}
+            value={currentLines.join('\n')}
+            onChange={(e) => handleFullTextChange(e.target.value)}
+            style={fullTextStyle}
+            className="w-full min-h-[400px] p-6 bg-white border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 leading-relaxed resize-none"
+            onInput={(e) => {
+              const target = e.target as HTMLTextAreaElement;
+              target.style.height = 'auto';
+              target.style.height = target.scrollHeight + 'px';
+            }}
+            dir="ltr"
+            spellCheck={true}
+            placeholder="Start writing your thoughts here..."
+            disabled={finalReadOnly}
+          />
+        )}
         <div className="mt-4 space-y-3">
           {currentLines.map((ln, i) => {
             const imgMatch = ln.match(/^!\[[^\]]*\]\(([^)]+)\)/);
@@ -708,6 +719,32 @@ const currentPage = pages[pageIndex] || { lines: [''], format: [textFormat] };
     document.title = "Note - Notebook";
   }, []);
 
+  if (finalReadOnly) {
+    return (
+      <>
+        <div className="h-screen flex flex-col">
+          <div className={`flex-1 ${fullscreen ? 'p-0' : 'p-4'} bg-gradient-to-br from-gray-50 to-blue-50 overflow-auto`}>
+            <div className={`${fullscreen ? 'h-full' : 'rounded-2xl shadow-2xl'} bg-white border border-gray-200 overflow-hidden`}>
+              <div className="p-6">
+                {mode === 'line' ? (
+                  <div className="max-w-4xl mx-auto">
+                    <div className="space-y-2">
+                      {currentLines.map((line, index) => 
+                        renderLineWithFormat(line, currentFormats[index] || textFormat, index)
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <FullPageEditor />
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
+
   return (
    <>
     {loadingFromServer ? (
@@ -721,7 +758,6 @@ const currentPage = pages[pageIndex] || { lines: [''], format: [textFormat] };
           {/* Top Toolbar */}
           <div className="border-b border-gray-200 bg-white p-3">
             <div className="flex flex-wrap items-center justify-between gap-4">
-              {/* Left Section */}
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2">
                   <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
@@ -735,6 +771,7 @@ const currentPage = pages[pageIndex] || { lines: [''], format: [textFormat] };
                     variant="ghost"
                     size="sm"
                     onClick={undo}
+                    disabled={historyIndex <= 0}
                     className="h-9 w-9 p-0"
                     title="Undo"
                   >
@@ -744,20 +781,19 @@ const currentPage = pages[pageIndex] || { lines: [''], format: [textFormat] };
                     variant="ghost"
                     size="sm"
                     onClick={redo}
+                    disabled={historyIndex >= history.length - 1}
                     className="h-9 w-9 p-0"
                     title="Redo"
                   >
                     <FaRedo className="text-base" />
                   </Button>
                   
-                  {/* Online/Offline indicator */}
                   <div className={`ml-2 px-3 py-1.5 rounded text-sm font-medium ${isOnline ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
                     {isOnline ? 'Online' : 'Offline'}
                   </div>
                 </div>
               </div>
 
-              {/* Center - Page Navigation */}
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2 bg-gray-100 rounded-lg px-3 py-1.5">
                   <Button
@@ -784,7 +820,6 @@ const currentPage = pages[pageIndex] || { lines: [''], format: [textFormat] };
                 </div>
               </div>
 
-              {/* Right Section */}
               <div className="flex items-center gap-2">
                 <Button
                   variant="ghost"
@@ -796,6 +831,7 @@ const currentPage = pages[pageIndex] || { lines: [''], format: [textFormat] };
                   <FaCopy className="text-base" />
                   <span className="hidden sm:inline">Copy</span>
                 </Button>
+               
                 <Button
                   variant="ghost"
                   size="sm"
@@ -806,6 +842,18 @@ const currentPage = pages[pageIndex] || { lines: [''], format: [textFormat] };
                   <FaDownload className="text-base" />
                   <span className="hidden sm:inline">Export</span>
                 </Button>
+               
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowShare(true)}
+                  className="gap-2 h-9 text-blue-600 hover:bg-blue-50"
+                  title="Share note"
+                >
+                  <FaShare className="text-base" />
+                  <span className="hidden sm:inline">Share</span>
+                </Button>
+               
                 <Button
                   variant="ghost"
                   size="sm"
@@ -813,175 +861,170 @@ const currentPage = pages[pageIndex] || { lines: [''], format: [textFormat] };
                   className="gap-2 h-9"
                   title={fullscreen ? "Exit fullscreen" : "Enter fullscreen"}
                 >
-                  {fullscreen ? <FaCompress className="text-base" /> : <FaExpand className="text-base" />}
+                  {fullscreen ? <FaCompress /> : <FaExpand />}
                 </Button>
               </div>
             </div>
           </div>
 
-          {/* Formatting Toolbar */}
-          <div className="border-b border-gray-200 bg-gray-50 p-3">
-            <div className="flex flex-wrap items-center gap-3">
-              {/* Font Family */}
-              <select
-                value={textFormat.fontFamily}
-                onChange={(e) => applyFormatToSelection({ fontFamily: e.target.value })}
-                className="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
-                {fonts.map(font => (
-                  <option key={font.value} value={font.value}>{font.name}</option>
-                ))}
-              </select>
-
-              {/* Font Size */}
-              <select
-                value={textFormat.fontSize}
-                onChange={(e) => applyFormatToSelection({ fontSize: parseInt(e.target.value) })}
-                className="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
-                {[12, 14, 16, 18, 20, 24, 28, 32, 36, 48].map(size => (
-                  <option key={size} value={size}>{size}px</option>
-                ))}
-              </select>
-
-              <div className="w-px h-6 bg-gray-300 mx-1"></div>
-
-              {/* Text Formatting */}
-              <Button
-                variant={textFormat.bold ? "secondary" : "ghost"}
-                size="sm"
-                onClick={() => applyFormatToSelection({ bold: !textFormat.bold })}
-                className="h-9 w-9 p-0"
-                title="Bold"
-              >
-                <FaBold className="text-base" />
-              </Button>
-              <Button
-                variant={textFormat.italic ? "secondary" : "ghost"}
-                size="sm"
-                onClick={() => applyFormatToSelection({ italic: !textFormat.italic })}
-                className="h-9 w-9 p-0"
-                title="Italic"
-              >
-                <FaItalic className="text-base" />
-              </Button>
-              <Button
-                variant={textFormat.underline ? "secondary" : "ghost"}
-                size="sm"
-                onClick={() => applyFormatToSelection({ underline: !textFormat.underline })}
-                className="h-9 w-9 p-0"
-                title="Underline"
-              >
-                <FaUnderline className="text-base" />
-              </Button>
-              <Button
-                variant={textFormat.strikethrough ? "secondary" : "ghost"}
-                size="sm"
-                onClick={() => applyFormatToSelection({ strikethrough: !textFormat.strikethrough })}
-                className="h-9 w-9 p-0"
-                title="Strikethrough"
-              >
-                <FaStrikethrough className="text-base" />
-              </Button>
-
-              <div className="w-px h-6 bg-gray-300 mx-1"></div>
-
-              {/* Text Alignment */}
-              <Button
-                variant={textFormat.align === 'left' ? "secondary" : "ghost"}
-                size="sm"
-                onClick={() => applyFormatToSelection({ align: 'left' })}
-                className="h-9 w-9 p-0"
-                title="Align Left"
-              >
-                <FaAlignLeft className="text-base" />
-              </Button>
-              <Button
-                variant={textFormat.align === 'center' ? "secondary" : "ghost"}
-                size="sm"
-                onClick={() => applyFormatToSelection({ align: 'center' })}
-                className="h-9 w-9 p-0"
-                title="Align Center"
-              >
-                <FaAlignCenter className="text-base" />
-              </Button>
-              <Button
-                variant={textFormat.align === 'right' ? "secondary" : "ghost"}
-                size="sm"
-                onClick={() => applyFormatToSelection({ align: 'right' })}
-                className="h-9 w-9 p-0"
-                title="Align Right"
-              >
-                <FaAlignRight className="text-base" />
-              </Button>
-
-              <div className="w-px h-6 bg-gray-300 mx-1"></div>
-
-              {/* Lists */}
-              <Button
-                variant={textFormat.listType === 'bullet' ? "secondary" : "ghost"}
-                size="sm"
-                onClick={() => applyFormatToSelection({ listType: textFormat.listType === 'bullet' ? 'none' : 'bullet' })}
-                className="h-9 w-9 p-0"
-                title="Bullet List"
-              >
-                <FaListUl className="text-base" />
-              </Button>
-              <Button
-                variant={textFormat.listType === 'number' ? "secondary" : "ghost"}
-                size="sm"
-                onClick={() => applyFormatToSelection({ listType: textFormat.listType === 'number' ? 'none' : 'number' })}
-                className="h-9 w-9 p-0"
-                title="Numbered List"
-              >
-                <FaListOl className="text-base" />
-              </Button>
-
-              <div className="w-px h-6 bg-gray-300 mx-1"></div>
-
-              {/* Headings */}
-              <Button
-                variant={textFormat.headingLevel === 1 ? "secondary" : "ghost"}
-                size="sm"
-                onClick={() => applyFormatToSelection({ headingLevel: textFormat.headingLevel === 1 ? 0 : 1 })}
-                className="h-9 w-9 p-0 font-bold"
-                title="Heading 1"
-              >
-                H1
-              </Button>
-              <Button
-                variant={textFormat.headingLevel === 2 ? "secondary" : "ghost"}
-                size="sm"
-                onClick={() => applyFormatToSelection({ headingLevel: textFormat.headingLevel === 2 ? 0 : 2 })}
-                className="h-9 w-9 p-0 font-bold"
-                title="Heading 2"
-              >
-                H2
-              </Button>
-
-              <div className="w-px h-6 bg-gray-300 mx-1"></div>
-
-              {/* Color Picker */}
-              <div className="flex items-center gap-2">
-                <input
-                  type="color"
-                  value={textFormat.color}
-                  onChange={(e) => applyFormatToSelection({ color: e.target.value })}
-                  className="w-9 h-9 cursor-pointer rounded border border-gray-300"
-                  title="Text Color"
-                />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => applyFormatToSelection({ highlight: '#FEF3C7' })}
-                  className="h-9 w-9 p-0"
-                  title="Highlight"
+          {/* Formatting Toolbar - Hidden when read-only */}
+          {!finalReadOnly && (
+            <div className="border-b border-gray-200 bg-gray-50 p-3">
+              <div className="flex flex-wrap items-center gap-3">
+                <select
+                  value={textFormat.fontFamily}
+                  onChange={(e) => applyFormatToSelection({ fontFamily: e.target.value })}
+                  className="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
-                  <FaHighlighter className="text-base" />
+                  {fonts.map(font => (
+                    <option key={font.value} value={font.value}>{font.name}</option>
+                  ))}
+                </select>
+
+                <select
+                  value={textFormat.fontSize}
+                  onChange={(e) => applyFormatToSelection({ fontSize: parseInt(e.target.value) })}
+                  className="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  {[12, 14, 16, 18, 20, 24, 28, 32, 36, 48].map(size => (
+                    <option key={size} value={size}>{size}px</option>
+                  ))}
+                </select>
+
+                <div className="w-px h-6 bg-gray-300 mx-1"></div>
+
+                <Button
+                  variant={textFormat.bold ? "secondary" : "ghost"}
+                  size="sm"
+                  onClick={() => applyFormatToSelection({ bold: !textFormat.bold })}
+                  className="h-9 w-9 p-0"
+                  title="Bold"
+                >
+                  <FaBold className="text-base" />
                 </Button>
+                <Button
+                  variant={textFormat.italic ? "secondary" : "ghost"}
+                  size="sm"
+                  onClick={() => applyFormatToSelection({ italic: !textFormat.italic })}
+                  className="h-9 w-9 p-0"
+                  title="Italic"
+                >
+                  <FaItalic className="text-base" />
+                </Button>
+                <Button
+                  variant={textFormat.underline ? "secondary" : "ghost"}
+                  size="sm"
+                  onClick={() => applyFormatToSelection({ underline: !textFormat.underline })}
+                  className="h-9 w-9 p-0"
+                  title="Underline"
+                >
+                  <FaUnderline className="text-base" />
+                </Button>
+                <Button
+                  variant={textFormat.strikethrough ? "secondary" : "ghost"}
+                  size="sm"
+                  onClick={() => applyFormatToSelection({ strikethrough: !textFormat.strikethrough })}
+                  className="h-9 w-9 p-0"
+                  title="Strikethrough"
+                >
+                  <FaStrikethrough className="text-base" />
+                </Button>
+
+                <div className="w-px h-6 bg-gray-300 mx-1"></div>
+
+                <Button
+                  variant={textFormat.align === 'left' ? "secondary" : "ghost"}
+                  size="sm"
+                  onClick={() => applyFormatToSelection({ align: 'left' })}
+                  className="h-9 w-9 p-0"
+                  title="Align Left"
+                >
+                  <FaAlignLeft className="text-base" />
+                </Button>
+                <Button
+                  variant={textFormat.align === 'center' ? "secondary" : "ghost"}
+                  size="sm"
+                  onClick={() => applyFormatToSelection({ align: 'center' })}
+                  className="h-9 w-9 p-0"
+                  title="Align Center"
+                >
+                  <FaAlignCenter className="text-base" />
+                </Button>
+                <Button
+                  variant={textFormat.align === 'right' ? "secondary" : "ghost"}
+                  size="sm"
+                  onClick={() => applyFormatToSelection({ align: 'right' })}
+                  className="h-9 w-9 p-0"
+                  title="Align Right"
+                >
+                  <FaAlignRight className="text-base" />
+                </Button>
+
+                <div className="w-px h-6 bg-gray-300 mx-1"></div>
+
+                <Button
+                  variant={textFormat.listType === 'bullet' ? "secondary" : "ghost"}
+                  size="sm"
+                  onClick={() => applyFormatToSelection({ listType: textFormat.listType === 'bullet' ? 'none' : 'bullet' })}
+                  className="h-9 w-9 p-0"
+                  title="Bullet List"
+                >
+                  <FaListUl className="text-base" />
+                </Button>
+                <Button
+                  variant={textFormat.listType === 'number' ? "secondary" : "ghost"}
+                  size="sm"
+                  onClick={() => applyFormatToSelection({ listType: textFormat.listType === 'number' ? 'none' : 'number' })}
+                  className="h-9 w-9 p-0"
+                  title="Numbered List"
+                >
+                  <FaListOl className="text-base" />
+                </Button>
+
+                <div className="w-px h-6 bg-gray-300 mx-1"></div>
+
+                <Button
+                  variant={textFormat.headingLevel === 1 ? "secondary" : "ghost"}
+                  size="sm"
+                  onClick={() => applyFormatToSelection({ headingLevel: textFormat.headingLevel === 1 ? 0 : 1 })}
+                  className="h-9 w-9 p-0 font-bold"
+                  title="Heading 1"
+                >
+                  H1
+                </Button>
+                <Button
+                  variant={textFormat.headingLevel === 2 ? "secondary" : "ghost"}
+                  size="sm"
+                  onClick={() => applyFormatToSelection({ headingLevel: textFormat.headingLevel === 2 ? 0 : 2 })}
+                  className="h-9 w-9 p-0 font-bold"
+                  title="Heading 2"
+                >
+                  H2
+                </Button>
+
+                <div className="w-px h-6 bg-gray-300 mx-1"></div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={textFormat.color}
+                    onChange={(e) => applyFormatToSelection({ color: e.target.value })}
+                    className="w-9 h-9 cursor-pointer rounded border border-gray-300"
+                    title="Text Color"
+                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => applyFormatToSelection({ highlight: '#FEF3C7' })}
+                    className="h-9 w-9 p-0"
+                    title="Highlight"
+                  >
+                    <FaHighlighter className="text-base" />
+                  </Button>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Mode Switcher */}
           <div className="border-b border-gray-200 bg-white px-4 py-3">
@@ -1007,34 +1050,36 @@ const currentPage = pages[pageIndex] || { lines: [''], format: [textFormat] };
               
               <div className="flex-1"></div>
               
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={insertLink}
-                  className="h-9 w-9 p-0"
-                  title="Insert Link"
-                >
-                  <FaLink className="text-base" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={insertImage}
-                  className="h-9 w-9 p-0"
-                  title="Insert Image"
-                >
-                  <FaImage className="text-base" />
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={addPage}
-                  className="gap-2 h-9 bg-blue-600 hover:bg-blue-700 text-white"
-                >
-                  <FaPlus className="text-base" />
-                  New Page
-                </Button>
-              </div>
+              {!finalReadOnly && (
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={insertLink}
+                    className="h-9 w-9 p-0"
+                    title="Insert Link"
+                  >
+                    <FaLink className="text-base" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={insertImage}
+                    className="h-9 w-9 p-0"
+                    title="Insert Image"
+                  >
+                    <FaImage className="text-base" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={addPage}
+                    className="gap-2 h-9 bg-blue-600 hover:bg-blue-700 text-white"
+                  >
+                    <FaPlus className="text-base" />
+                    New Page
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -1056,17 +1101,18 @@ const currentPage = pages[pageIndex] || { lines: [''], format: [textFormat] };
                   </div>
                 )}
                 
-                {/* Add Line Button */}
-                <div className="mt-6 flex justify-center">
-                  <Button
-                    onClick={addLine}
-                    variant="outline"
-                    className="gap-2 h-10 border-dashed border-gray-300 hover:border-blue-400 hover:bg-blue-50"
-                  >
-                    <FaPlus className="text-base" />
-                    Add New Line
-                  </Button>
-                </div>
+                {!finalReadOnly && (
+                  <div className="mt-6 flex justify-center">
+                    <Button
+                      onClick={addLine}
+                      variant="outline"
+                      className="gap-2 h-10 border-dashed border-gray-300 hover:border-blue-400 hover:bg-blue-50"
+                    >
+                      <FaPlus className="text-base" />
+                      Add New Line
+                    </Button>
+                  </div>
+                )}
               </div>
             ) : (
               <FullPageEditor />
@@ -1088,6 +1134,21 @@ const currentPage = pages[pageIndex] || { lines: [''], format: [textFormat] };
               </div>
             </div>
           </div>
+        </div>
+      </div>
+    )}
+
+    {/* Sharing Panel Modal */}
+    {showShare && (
+      <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => setShowShare(false)}>
+        <div className="bg-white w-full max-w-lg rounded-xl shadow-xl p-4 relative" onClick={(e) => e.stopPropagation()}>
+          <button
+            onClick={() => setShowShare(false)}
+            className="absolute top-2 right-2 text-gray-500 hover:text-black w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
+          >
+            ✕
+          </button>
+          <SharingPanel noteId={noteId} />
         </div>
       </div>
     )}

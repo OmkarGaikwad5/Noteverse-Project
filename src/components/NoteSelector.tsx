@@ -2,7 +2,7 @@
 import { useRouter } from "next/navigation";
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import ModalWrapper from "./custom/ModalWrapper";
-import { FiEdit2, FiTrash2, FiMoreVertical, FiPlus, FiFileText, FiX, FiArrowRight } from "react-icons/fi";
+import { FiEdit2, FiTrash2, FiMoreVertical, FiPlus, FiFileText, FiX, FiArrowRight, FiGlobe } from "react-icons/fi";
 import { FaPalette, FaBook, FaCheck, FaPen, FaPenNib } from "react-icons/fa";
 import { BsBrush } from "react-icons/bs";
 import BinButton from "./custom/BinButton";
@@ -17,6 +17,7 @@ interface Note {
     type: NoteType;
     createdAt: string;
     updatedAt?: string;
+    isPublic?: boolean;
 }
 
 const LOCAL_STORAGE_KEY = "noteverse-notes";
@@ -346,6 +347,44 @@ const NoteSelector: React.FC = () => {
                                                                 <FiEdit2 className="text-gray-500 text-sm sm:text-base" />
                                                                 Rename
                                                             </button>
+
+                                                            <button
+                                                                type="button"
+                                                                onClick={async (e) => {
+                                                                    e.preventDefault();
+                                                                    setActionInProgress(note.id);
+                                                                    try {
+                                                                        const res = await fetch(`/api/notes/${note.id}/public`, {
+                                                                            method: 'PUT',
+                                                                            headers: { 'Content-Type': 'application/json' },
+                                                                            body: JSON.stringify({ isPublic: !note.isPublic })
+                                                                        });
+                                                                        if (res.ok) {
+                                                                            const data = await res.json();
+                                                                            // Update the note's public status in UI
+                                                                            setNotes(prev => prev.map(n => 
+                                                                                n.id === note.id ? { ...n, isPublic: data.isPublic } : n
+                                                                            ));
+                                                                            toast.success({ 
+                                                                                title: data.isPublic ? "Note is now public" : "Note is now private", 
+                                                                                description: data.isPublic ? "Anyone can now import this note" : "This note is now private" 
+                                                                            });
+                                                                        }
+                                                                    } catch (err) {
+                                                                        console.error("Failed to update public status", err);
+                                                                        toast.error({ title: "Failed", description: "Could not update visibility" });
+                                                                    } finally {
+                                                                        setActionInProgress(null);
+                                                                        setOpenMenuId(null);
+                                                                    }
+                                                                }}
+                                                                disabled={isProcessing}
+                                                                className="flex items-center gap-3 w-full px-3 sm:px-4 py-2 sm:py-3 text-left text-gray-700 hover:bg-gray-50 transition-colors text-sm sm:text-base disabled:opacity-50"
+                                                            >
+                                                                <FiGlobe className="text-gray-500 text-sm sm:text-base" />
+                                                                {note.isPublic ? 'Make Private' : 'Make Public'}
+                                                            </button>
+
                                                             <button
                                                                 type="button"
                                                                 onClick={(e) => {

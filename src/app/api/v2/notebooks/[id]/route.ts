@@ -13,16 +13,14 @@ export async function DELETE(req: Request) {
             return NextResponse.json({ message: 'Missing id' }, { status: 400 });
         }
 
-        const notebook = await Notebook.findById(id);
+        // Hard delete from Library only (not soft delete)
+        const notebook = await Notebook.findByIdAndDelete(id);
+        
         if (!notebook) {
             return NextResponse.json({ message: 'Not found' }, { status: 404 });
         }
 
-        // Soft-delete
-        notebook.isDeleted = true;
-        await notebook.save();
-
-        return NextResponse.json({ message: 'Deleted' }, { status: 200 });
+        return NextResponse.json({ message: 'Deleted from Library' }, { status: 200 });
     } catch (error) {
         console.error('Delete Notebook Error', error);
         return NextResponse.json({ message: 'Error deleting notebook' }, { status: 500 });

@@ -1,4 +1,3 @@
-
 import mongoose, { Schema, Document } from 'mongoose';
 
 export interface INote extends Document<string> {
@@ -7,6 +6,7 @@ export interface INote extends Document<string> {
     title: string;
     type: 'canvas' | 'notebook';
     isDeleted: boolean;
+    isPublic: boolean; 
     updatedAt: Date;
     serverUpdatedAt: Date;
     createdAt: Date;
@@ -18,15 +18,15 @@ export interface INote extends Document<string> {
 }
 
 const NoteSchema: Schema = new Schema({
-    _id: { type: String, required: true }, // Client-side generated ID
+    _id: { type: String, required: true },
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     title: { type: String, required: true, default: 'Untitled' },
     type: { type: String, enum: ['canvas', 'notebook'], required: true },
     isDeleted: { type: Boolean, default: false },
+    isPublic: { type: Boolean, default: false }, // New field
     updatedAt: { type: Date, required: true },
     serverUpdatedAt: { type: Date, default: Date.now },
-    createdAt: { type: Date, default: Date.now }
-    ,
+    createdAt: { type: Date, default: Date.now },
     sharedWith: [{
         userId: { type: Schema.Types.ObjectId, ref: 'User' },
         permission: { type: String, enum: ['view', 'edit'], default: 'view' },
@@ -35,5 +35,6 @@ const NoteSchema: Schema = new Schema({
 });
 
 NoteSchema.index({ userId: 1, updatedAt: -1 });
+NoteSchema.index({ isPublic: 1, createdAt: -1 }); // Index for public notes query
 
 export default mongoose.models.Note || mongoose.model<INote>('Note', NoteSchema);

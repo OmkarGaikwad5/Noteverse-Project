@@ -52,7 +52,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
 
     await AuditLog.create({ noteId: note._id, action: 'invite_accepted', userId: dbUser._id, details: { inviterId: invite.inviterId } });
 
-    return NextResponse.json({ status: 'accepted' });
+     return NextResponse.json({
+       status: "accepted",
+       noteId: invite.noteId,
+       type: note.type   
+     });
   } catch (e) {
     console.error('Invite accept error', e);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });

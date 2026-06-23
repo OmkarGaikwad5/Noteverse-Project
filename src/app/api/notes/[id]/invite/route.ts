@@ -31,10 +31,28 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     // Create share link
     const base = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || '';
-    const link = `${base}/api/invite/${token}`;
+    
+    const mode = note.type === "notebook" ? "notebook" : "canvas";
+    const link = `${base}/invite/${token}?mode=${mode}`;
 
     // Send email (placeholder)
-    await sendMail(email, `${dbUser?.email} invited you to a note`, `You were invited to ${note.title}. Accept: ${link}\n\nMessage: ${message || ''}`);
+    await sendMail(
+         email,
+         `You were invited to collaborate on "${note.title}"`,
+         `
+       ${dbUser.email} invited you to a note.
+       
+       📄 Note: ${note.title}
+       
+       👉 Click below to open:
+       ${link}
+       
+       Message:
+       ${message || "No message"}
+       
+       If you did not expect this, ignore this email.
+       `
+       );
 
     await AuditLog.create({ noteId: id, action: 'invite_created', userId: dbUser._id, details: { email, permission } });
 

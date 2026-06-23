@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   FiPlus, FiGrid, FiList, FiSearch, FiUser, 
   FiCalendar, FiEdit3, FiTrash2, FiMoreVertical,
   FiFileText, FiImage, FiFolder, FiClock,
-  FiChevronRight, FiStar, FiShare2, FiX
+  FiChevronRight, FiStar, FiShare2, FiX, FiRefreshCw
 } from 'react-icons/fi';
 import { 
   FaPalette, FaBook, FaPenFancy, FaRegStar,
@@ -58,54 +58,69 @@ export default function NotebookGrid() {
     lastUpdated: ''
   });
 
-  // Fetch notebooks
-  useEffect(() => {
-    const fetchNotebooks = async () => {
-      try {
-        // Get user data
-        const res = await fetch('/api/auth/me');
-        if (!res.ok) throw new Error("Not authenticated");
-        const userData = await res.json();
+  // Fetch notebooks function
+  const fetchNotebooks = useCallback(async () => {
+    try {
+      setLoading(true);
+      
+      // Get user data
+      const res = await fetch('/api/auth/me');
+      if (!res.ok) throw new Error("Not authenticated");
+      const userData = await res.json();
 
-        // Fetch notebooks
-        const resNotes = await fetch(`/api/v2/notebooks?userId=${userData.user.id}`);
-        const data = await resNotes.json();
-        const notebooksData = data.notebooks || [];
-        
-        // Format notebooks with additional data
-        const formattedNotebooks = notebooksData.map((nb: Notebook) => ({
-          ...nb,
-          description: nb.description || `A ${nb.type === 'canvas' ? 'whiteboard' : 'text'} notebook`,
-          pages: nb.type === 'canvas' ? Math.floor(Math.random() * 20) + 1 : Math.floor(Math.random() * 50) + 1,
-          isStarred: Math.random() > 0.7,
-          lastAccessed: new Date(nb.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-        }));
+      // Fetch notebooks from the correct API
+      const resNotes = await fetch(`/api/v2/notebooks?userId=${userData.user.id}`);
+      if (!resNotes.ok) throw new Error("Failed to fetch notebooks");
+      
+      const data = await resNotes.json();
+      const notebooksData = data.notebooks || [];
+      
+      // Format notebooks with additional data
+      const formattedNotebooks = notebooksData.map((nb: Notebook) => ({
+        ...nb,
+        description: nb.description || `A ${nb.type === 'canvas' ? 'whiteboard' : 'text'} notebook`,
+        pages: nb.type === 'canvas' ? Math.floor(Math.random() * 20) + 1 : Math.floor(Math.random() * 50) + 1,
+        isStarred: false,
+        lastAccessed: new Date(nb.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+      }));
 
-        setNotebooks(formattedNotebooks);
-        setFilteredNotebooks(formattedNotebooks);
-        
-        // Calculate stats
-        const canvasCount = formattedNotebooks.filter((n: Notebook) => n.type === 'canvas').length;
-        const noteCount = formattedNotebooks.filter((n: Notebook) => n.type === 'note').length;
-        const lastUpdated = formattedNotebooks.length > 0 
-          ? new Date(formattedNotebooks[0].updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-          : 'Never';
+      setNotebooks(formattedNotebooks);
+      
+      // Calculate stats
+      const canvasCount = formattedNotebooks.filter((n: Notebook) => n.type === 'canvas').length;
+      const noteCount = formattedNotebooks.filter((n: Notebook) => n.type === 'note').length;
+      const lastUpdated = formattedNotebooks.length > 0 
+        ? new Date(formattedNotebooks[0].updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+        : 'Never';
 
-        setStats({
-          total: formattedNotebooks.length,
-          canvas: canvasCount,
-          note: noteCount,
-          lastUpdated
-        });
-      } catch (e) {
-        console.error("Failed to fetch notebooks", e);
-        toast.error({ title: "Failed to load notebooks", description: "Please refresh and try again." });
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchNotebooks();
+      setStats({
+        total: formattedNotebooks.length,
+        canvas: canvasCount,
+        note: noteCount,
+        lastUpdated
+      });
+    } catch (e) {
+      console.error("Failed to fetch notebooks", e);
+      toast.error({ title: "Failed to load notebooks", description: "Please refresh and try again." });
+    } finally {
+      setLoading(false);
+    }
   }, [toast]);
+
+  // Initial fetch
+  useEffect(() => {
+    fetchNotebooks();
+  }, [fetchNotebooks]);
+
+  // Listen for refresh events after migration
+  useEffect(() => {
+    const handleRefresh = () => {
+      fetchNotebooks();
+    };
+
+    window.addEventListener('noteverse-refresh', handleRefresh);
+    return () => window.removeEventListener('noteverse-refresh', handleRefresh);
+  }, [fetchNotebooks]);
 
   // Filter and sort notebooks
   useEffect(() => {
@@ -169,22 +184,13 @@ export default function NotebookGrid() {
           userId: userData.user.id,
           title: newTitle,
           description: newDescription,
-          coverColor: newType === 'canvas' ? '#6366F1' : '#10B981', // Indigo for canvas, Emerald for note
+          coverColor: newType === 'canvas' ? '#6366F1' : '#10B981',
           type: newType
         })
       });
 
       if (res.ok) {
-        const data = await res.json();
-        const newNotebook = {
-          ...data.notebook,
-          description: newDescription,
-          pages: 1,
-          isStarred: false,
-          lastAccessed: 'Now'
-        };
-        
-        setNotebooks([newNotebook, ...notebooks]);
+        await fetchNotebooks(); // Refresh the list
         setIsCreating(false);
         setNewTitle('');
         setNewDescription('');
@@ -198,11 +204,14 @@ export default function NotebookGrid() {
     }
   };
 
-  const handleStarClick = (id: string, e: React.MouseEvent) => {
+  const handleStarClick = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    // Toggle star locally first for instant feedback
     setNotebooks(notebooks.map(nb =>
       nb._id === id ? { ...nb, isStarred: !nb.isStarred } : nb
     ));
+    
+    // TODO: Save star status to server
   };
 
   const handleDeleteClick = async (id: string, e: React.MouseEvent) => {
@@ -214,7 +223,7 @@ export default function NotebookGrid() {
         });
         
         if (res.ok) {
-          setNotebooks(notebooks.filter(nb => nb._id !== id));
+          await fetchNotebooks(); // Refresh the list
           toast.success({ title: "Notebook deleted", description: "The notebook was removed." });
         } else {
           toast.error({ title: "Delete failed", description: "Could not delete notebook." });
@@ -287,6 +296,14 @@ export default function NotebookGrid() {
             </div>
             
             <div className="flex items-center gap-3">
+              <button
+                onClick={() => fetchNotebooks()}
+                className="w-10 h-10 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center text-gray-700 hover:bg-gray-200 transition-colors shadow-sm"
+                title="Refresh"
+              >
+                <FiRefreshCw className="w-5 h-5" />
+              </button>
+              
               <button
                 onClick={() => router.push('/profile')}
                 className="w-10 h-10 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center text-gray-700 hover:bg-gray-200 transition-colors shadow-sm"
@@ -418,7 +435,28 @@ export default function NotebookGrid() {
         </div>
 
         {/* Notebooks Grid/List */}
-        {viewMode === 'grid' ? (
+        {filteredNotebooks.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="w-20 h-20 bg-gradient-to-r from-gray-200 to-gray-300 rounded-full flex items-center justify-center mb-4">
+              <FaBook className="text-gray-400 text-2xl" />
+            </div>
+            <h3 className="text-xl font-semibold text-gray-800 mb-2">No notebooks found</h3>
+            <p className="text-gray-600 text-sm max-w-md mb-6">
+              {searchQuery 
+                ? `No notebooks match "${searchQuery}". Try a different search term.`
+                : 'Create your first notebook to start capturing ideas and notes.'}
+            </p>
+            {!searchQuery && (
+              <button
+                onClick={handleCreateClick}
+                className="flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:shadow-lg transition-all duration-300 hover:scale-105 text-sm"
+              >
+                <FiPlus className="w-4 h-4" />
+                Create Your First Notebook
+              </button>
+            )}
+          </div>
+        ) : viewMode === 'grid' ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {filteredNotebooks.map((notebook) => {
               const typeColors = getTypeColor(notebook.type);
@@ -448,10 +486,7 @@ export default function NotebookGrid() {
                       </button>
                       <button
                         type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteClick(notebook._id, e);
-                        }}
+                        onClick={(e) => handleDeleteClick(notebook._id, e)}
                         className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                         title="Delete Notebook"
                       >
@@ -551,28 +586,6 @@ export default function NotebookGrid() {
                 </div>
               );
             })}
-          </div>
-        )}
-
-        {/* Empty State */}
-        {filteredNotebooks.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="w-20 h-20 bg-gradient-to-r from-gray-200 to-gray-300 rounded-full flex items-center justify-center mb-4">
-              <FaBook className="text-gray-400 text-2xl" />
-            </div>
-            <h3 className="text-xl font-semibold text-gray-800 mb-2">No notebooks found</h3>
-            <p className="text-gray-600 text-sm max-w-md mb-6">
-              {searchQuery 
-                ? `No notebooks match "${searchQuery}". Try a different search term.`
-                : 'Create your first notebook to start capturing ideas and notes.'}
-            </p>
-            <button
-              onClick={handleCreateClick}
-              className="flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:shadow-lg transition-all duration-300 hover:scale-105 text-sm"
-            >
-              <FiPlus className="w-4 h-4" />
-              Create Your First Notebook
-            </button>
           </div>
         )}
       </div>

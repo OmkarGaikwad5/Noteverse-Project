@@ -300,15 +300,6 @@ export default function Home() {
               transition={{ duration: 0.6 }}
               className="w-full lg:w-[55%] text-center lg:text-left"
             >
-              <motion.div 
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={heroInView ? { opacity: 1, scale: 1 } : {}}
-                transition={{ duration: 0.5, delay: 0.2 }}
-                className="inline-flex items-center px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-gradient-to-r from-blue-50 to-purple-50 text-blue-600 text-xs sm:text-sm font-medium mb-3 sm:mb-4 border border-blue-100"
-              >
-                <HiOutlineSparkles className="mr-1.5 sm:mr-2 w-3 h-3 sm:w-4 sm:h-4" />
-                Introducing AI-Powered Notes
-              </motion.div>
               
               <motion.h1 
                 initial={{ opacity: 0, y: 20 }}
