@@ -809,7 +809,6 @@ const updateDrawing = (pos: { x: number; y: number }) => {
   // ============================================================================
 
   const exportCanvas = async (format: 'png' | 'jpg' | 'pdf') => {
-  // Only PDF is supported now, but keeping format parameter for flexibility
   console.log('Exporting PDF...');
   
   const stage = stageRef.current;
@@ -821,7 +820,13 @@ const updateDrawing = (pos: { x: number; y: number }) => {
   setIsExporting(true);
 
   try {
-    const { jsPDF } = await import('jspdf');
+    // Import jsPDF differently to avoid build issues
+    const jsPDFModule = await import('jspdf');
+    const jsPDF = jsPDFModule.default || jsPDFModule.jsPDF;
+    
+    if (!jsPDF) {
+      throw new Error('jsPDF library not loaded properly');
+    }
     
     // Get all pages
     const totalPages = lines.length;
