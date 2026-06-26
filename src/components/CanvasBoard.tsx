@@ -21,7 +21,7 @@ import SharingPanel from '@/components/SharingPanel';
 import { useSession } from 'next-auth/react';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { useToast } from '@/hooks/useToast';
-
+import { jsPDF } from "jspdf";
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -822,7 +822,7 @@ export default function CanvasBoard({ noteId, isReadOnly = false }: { noteId: st
     try {
       // Import jsPDF differently to avoid build issues
       const jsPDFModule = await import('jspdf');
-      const jsPDF = jsPDFModule.default || jsPDFModule.jsPDF;
+      const jsPDF = jsPDFModule.default;
 
       if (!jsPDF) {
         throw new Error('jsPDF library not loaded properly');
