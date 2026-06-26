@@ -279,62 +279,164 @@ export default function Home() {
 
 
       {/* Hero Section - FIXED: Proper spacing and image constraints */}
-      {/* Hero Section */}
-<section className="pt-28 pb-20 bg-gray-50">
-  <div className="max-w-4xl mx-auto px-6 text-center">
+      <section ref={heroRef} className="relative pt-20 sm:pt-24 lg:pt-28 pb-12 sm:pb-16 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex flex-col lg:flex-row lg:items-center gap-8 lg:gap-12">
+            {/* Left Content - Takes full width on mobile, 55% on desktop */}
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={heroInView ? { opacity: 1, y: 0 } : {}}
+              transition={{ duration: 0.6 }}
+              className="w-full lg:w-[55%] text-center lg:text-left"
+            >
+              
+              <motion.h1 
+                initial={{ opacity: 0, y: 20 }}
+                animate={heroInView ? { opacity: 1, y: 0 } : {}}
+                transition={{ duration: 0.6, delay: 0.3 }}
+                className="text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-bold tracking-tight mb-3 sm:mb-4"
+              >
+                <span className="block">Where Your</span>
+                <span className="block mt-1">
+                  <span className="bg-gradient-to-r from-blue-600 via-blue-500 to-purple-600 bg-clip-text text-transparent animate-gradient-x">
+                    Thoughts
+                  </span>
+                  <span className="mx-2 text-gray-900">Meet</span>
+                  <span className="bg-gradient-to-r from-purple-600 via-pink-500 to-purple-600 bg-clip-text text-transparent animate-gradient-x animation-delay-1000">
+                    Creativity
+                  </span>
+                </span>
+              </motion.h1>
+              
+              <motion.p 
+                initial={{ opacity: 0, y: 20 }}
+                animate={heroInView ? { opacity: 1, y: 0 } : {}}
+                transition={{ duration: 0.6, delay: 0.4 }}
+                className="text-sm sm:text-base lg:text-lg text-gray-600 max-w-2xl mx-auto lg:mx-0 mb-5 sm:mb-6"
+              >
+                Your all-in-one digital notebook for ideas, drawings, and collaboration. 
+                Perfect for students, professionals, and creative minds.
+              </motion.p>
+              
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={heroInView ? { opacity: 1, y: 0 } : {}}
+                transition={{ duration: 0.6, delay: 0.5 }}
+                className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start"
+              >
+                <Link
+                  href="/home"
+                  className="group relative bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 sm:px-8 py-3 rounded-xl font-semibold text-sm sm:text-base hover:shadow-2xl transition-all duration-300 hover:scale-105 flex items-center justify-center"
+                >
+                  <span>Start Your Journey</span>
+                  <FaArrowRight className="ml-2 group-hover:translate-x-1 transition-transform w-3 h-3 sm:w-4 sm:h-4" />
+                </Link>
+                <Link
+                  href="/library"
+                  className="bg-white text-gray-800 px-6 sm:px-8 py-3 rounded-xl font-semibold text-sm sm:text-base border-2 border-gray-200 hover:border-blue-500 transition-all duration-300 hover:shadow-lg flex items-center justify-center"
+                >
+                  Explore Library
+                </Link>
+              </motion.div>
 
-    {/* Badge */}
-    <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-purple-100 text-purple-700 text-sm rounded-full mb-6">
-      <span className="bg-purple-600 text-white text-xs px-2 py-0.5 rounded-full">
-        New
-      </span>
-      Real-Time Transcription • AI-Enhanced Notes →
-    </div>
+              {/* Social Proof */}
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={heroInView ? { opacity: 1 } : {}}
+                transition={{ duration: 0.6, delay: 0.6 }}
+                className="mt-6 sm:mt-8 flex flex-wrap items-center justify-center lg:justify-start gap-4 sm:gap-6"
+              >
+                <div className="flex -space-x-2">
+                  {[1, 2, 3, 4].map((i) => (
+                    <div key={i} className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 border-2 border-white flex items-center justify-center text-white text-xs font-bold">
+                      U{i}
+                    </div>
+                  ))}
+                </div>
+                <div className="text-left">
+                  <div className="flex items-center gap-1">
+                    {[1, 2, 3, 4, 5].map((i) => (
+                      <FaStar key={i} className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-400 fill-current" />
+                    ))}
+                  </div>
+                  <p className="text-xs sm:text-sm text-gray-600 mt-1">
+                    <span className="font-semibold">10,000+</span> creators trust us
+                  </p>
+                </div>
+              </motion.div>
+            </motion.div>
 
-    {/* Heading */}
-    <h1 className="text-4xl md:text-5xl font-bold text-gray-900 leading-tight mb-6">
-      AI notepad your meeting <br />
-      productivity booster
-    </h1>
+            {/* Right Content - Hero Image - Responsive with height constraints */}
+            <motion.div
+              initial={{ opacity: 0, x: 30 }}
+              animate={heroInView ? { opacity: 1, x: 0 } : {}}
+              transition={{ duration: 0.6, delay: 0.4 }}
+              className="w-full lg:w-[45%] relative"
+            >
+              <div className="relative rounded-xl sm:rounded-2xl overflow-hidden shadow-xl sm:shadow-2xl border border-gray-200/60 max-w-md mx-auto lg:max-w-none">
+                <div className="absolute inset-0 bg-gradient-to-tr from-blue-600/10 to-purple-600/10"></div>
+                <div className="aspect-[16/10] sm:aspect-[16/9] relative">
+                  <Image
+                    src="https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1920&q=80"
+                    alt="NoteVerse Interface"
+                    fill
+                    className="object-cover"
+                    priority
+                    sizes="(max-width: 640px) 90vw, (max-width: 1024px) 80vw, 45vw"
+                  />
+                </div>
+                
+                {/* Floating UI Elements - Adjusted for mobile */}
+                <motion.div 
+                  animate={{ y: [-3, 3] }}
+                  transition={{ duration: 4, repeat: Infinity, repeatType: "reverse" }}
+                  className="absolute top-2 sm:top-4 left-2 sm:left-4 bg-white/95 backdrop-blur rounded-md sm:rounded-lg px-2 sm:px-3 py-1 sm:py-2 shadow-md sm:shadow-lg border border-gray-200 flex items-center gap-1 sm:gap-2"
+                >
+                  <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-green-500 rounded-full"></div>
+                  <span className="text-[10px] sm:text-xs font-medium">AI Processing</span>
+                </motion.div>
+                
+                <motion.div 
+                  animate={{ y: [3, -3] }}
+                  transition={{ duration: 5, repeat: Infinity, repeatType: "reverse", delay: 1 }}
+                  className="absolute bottom-2 sm:bottom-4 right-2 sm:right-4 bg-white/95 backdrop-blur rounded-md sm:rounded-lg px-2 sm:px-3 py-1 sm:py-2 shadow-md sm:shadow-lg border border-gray-200 flex items-center gap-1 sm:gap-2"
+                >
+                  <FaSync className="text-blue-500 animate-spin-slow w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                  <span className="text-[10px] sm:text-xs font-medium">Synced</span>
+                </motion.div>
+              </div>
+              
+              {/* Stats Cards - Hidden on mobile, visible on desktop */}
+              <div className="absolute -bottom-6 -left-6 hidden lg:block">
+                <motion.div 
+                  animate={{ y: [-3, 3] }}
+                  transition={{ duration: 3, repeat: Infinity, repeatType: "reverse" }}
+                  className="bg-white rounded-xl shadow-xl p-4 border border-gray-200"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-gradient-to-r from-green-500 to-emerald-500 rounded-lg flex items-center justify-center">
+                      <FaBolt className="text-white" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold">2.5x</p>
+                      <p className="text-xs text-gray-600">Faster notes</p>
+                    </div>
+                  </div>
+                </motion.div>
+              </div>
+            </motion.div>
+          </div>
+        </div>
 
-    {/* Subheading */}
-    <p className="text-gray-600 text-lg mb-8 max-w-2xl mx-auto">
-      Meet the modern standard for public-facing documentation.
-      Beautiful out of the box, easy to maintain, and built to convert users.
-    </p>
-
-    {/* Buttons */}
-    <div className="flex justify-center gap-4 mb-16">
-      <Link
-        href="/signup"
-        className="bg-purple-600 text-white px-6 py-3 rounded-md font-medium hover:bg-purple-700 transition"
-      >
-        Get Started
-      </Link>
-
-      <Link
-        href="/demo"
-        className="bg-white border border-gray-300 px-6 py-3 rounded-md font-medium text-gray-700 hover:bg-gray-100 transition"
-      >
-        Get a Demo
-      </Link>
-    </div>
-  </div>
-
-  {/* Product Preview */}
-  <div className="max-w-5xl mx-auto px-6">
-    <div className="rounded-xl overflow-hidden shadow-xl border border-gray-200">
-      <Image
-        src="/hero-preview.png"   // Replace with your product screenshot
-        alt="NoteVerse Dashboard"
-        width={1200}
-        height={700}
-        className="w-full"
-      />
-    </div>
-  </div>
-</section>
-
+        {/* Scroll Indicator - Adjusted position */}
+        <motion.div 
+          animate={{ y: [0, 8, 0] }}
+          transition={{ duration: 2, repeat: Infinity }}
+          className="absolute bottom-2 sm:bottom-4 left-1/2 transform -translate-x-1/2"
+        >
+          <FaChevronDown className="text-gray-400 w-4 h-4 sm:w-5 sm:h-5" />
+        </motion.div>
+      </section>
 
       {/* Stats Section */}
     {/* Stats Section */}
@@ -360,42 +462,60 @@ export default function Home() {
 
       {/* Rest of the sections remain exactly the same... */}
       {/* Features Section - Modern Grid */}
-    {/* Features Section */}
-<section id="features" className="py-20 bg-gray-50">
-  <div className="max-w-6xl mx-auto px-6">
-
-    <div className="text-center mb-16">
-      <h2 className="text-4xl font-bold text-gray-900 mb-4">
-        Everything you need for better notes
-      </h2>
-      <p className="text-gray-600 max-w-2xl mx-auto">
-        Powerful features designed for modern teams and individuals.
-      </p>
-    </div>
-
-    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-      {features.map((feature, index) => (
-        <div
-          key={index}
-          className="bg-white p-8 rounded-xl border border-gray-200 hover:shadow-md transition"
-        >
-          <div className="w-10 h-10 bg-purple-100 text-purple-600 rounded-md flex items-center justify-center mb-5">
-            {feature.icon}
+      <section id="features" ref={featuresRef} className="py-12 sm:py-16 lg:py-20 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={featuresInView ? { opacity: 1, y: 0 } : {}}
+            transition={{ duration: 0.6 }}
+            className="text-center mb-8 sm:mb-12 lg:mb-16"
+          >
+            <span className="inline-block px-3 py-1 sm:px-4 sm:py-2 rounded-full bg-gradient-to-r from-blue-50 to-purple-50 text-blue-600 text-xs sm:text-sm font-medium mb-3 sm:mb-4 border border-blue-100">
+              <HiOutlineSparkles className="inline mr-1 w-3 h-3 sm:w-4 sm:h-4" />
+              Powerful Features
+            </span>
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl xl:text-5xl font-bold mb-3 sm:mb-4">
+              Everything You Need for
+              <span className="block mt-1 sm:mt-2 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                Perfect Notes
+              </span>
+            </h2>
+            <p className="text-sm sm:text-base lg:text-lg text-gray-600 max-w-3xl mx-auto px-4">
+              From simple notes to complex diagrams, we&apos;ve got you covered
+            </p>
+          </motion.div>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 lg:gap-6">
+            {features.map((feature, index) => (
+              <motion.div
+                key={index}
+                initial={{ opacity: 0, y: 30 }}
+                animate={featuresInView ? { opacity: 1, y: 0 } : {}}
+                transition={{ duration: 0.5, delay: index * 0.1 }}
+                whileHover={{ y: -5, scale: 1.02 }}
+                onHoverStart={() => setHoveredFeature(index)}
+                onHoverEnd={() => setHoveredFeature(null)}
+                className={`group relative bg-white p-5 sm:p-6 lg:p-8 rounded-xl sm:rounded-2xl border ${feature.border} hover:border-transparent transition-all duration-300 hover:shadow-2xl ${feature.shadow}`}
+              >
+                <div className={`absolute inset-0 ${feature.gradient} rounded-xl sm:rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300`}></div>
+                <div className="relative">
+                  <div className={`inline-flex p-2.5 sm:p-3 lg:p-4 rounded-lg sm:rounded-xl bg-gradient-to-br ${feature.color} text-white mb-3 sm:mb-4 lg:mb-6 group-hover:scale-110 transition-transform duration-300 shadow-lg`}>
+                    {feature.icon}
+                  </div>
+                  <h3 className="text-base sm:text-lg lg:text-xl xl:text-2xl font-bold mb-1.5 sm:mb-2 lg:mb-3 text-gray-800">{feature.title}</h3>
+                  <p className="text-xs sm:text-sm lg:text-base text-gray-600 leading-relaxed">{feature.description}</p>
+                  
+                  {/* Hover Indicator */}
+                  <motion.div 
+                    animate={{ width: hoveredFeature === index ? '100%' : '0%' }}
+                    className="absolute bottom-0 left-0 h-0.5 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full"
+                  />
+                </div>
+              </motion.div>
+            ))}
           </div>
-
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">
-            {feature.title}
-          </h3>
-
-          <p className="text-gray-600 text-sm leading-relaxed">
-            {feature.description}
-          </p>
         </div>
-      ))}
-    </div>
-
-  </div>
-</section>
+      </section>
 
 {/* How It Works */}
 <section className="py-20 bg-white border-t border-gray-200">

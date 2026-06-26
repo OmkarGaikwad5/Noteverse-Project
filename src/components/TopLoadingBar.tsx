@@ -24,39 +24,43 @@ export default function TopLoadingBar() {
   const currentRoute = useRef("");
 
   const start = useCallback(() => {
-    if (hideTimer.current) {
-      window.clearTimeout(hideTimer.current);
-      hideTimer.current = null;
-    }
-
-    setVisible(true);
-    setProgress((p) => (p > 5 ? p : 8));
-
-    if (timer.current) return;
-
-    // Smoothly progress and never complete until all work is done.
-    timer.current = window.setInterval(() => {
-      setProgress((p) => {
-        const remaining = 92 - p;
-        if (remaining <= 0.5) return 92;
-        return p + Math.max(0.4, remaining * 0.08);
+      if (hideTimer.current) {
+        window.clearTimeout(hideTimer.current);
+        hideTimer.current = null;
+      }
+    
+      // ✅ Defer state update safely
+      queueMicrotask(() => {
+        setVisible(true);
+        setProgress((p) => (p > 5 ? p : 8));
       });
-    }, 120);
-  }, []);
+    
+      if (timer.current) return;
+    
+      timer.current = window.setInterval(() => {
+        setProgress((p) => {
+          const remaining = 92 - p;
+          if (remaining <= 0.5) return 92;
+          return p + Math.max(0.4, remaining * 0.08);
+        });
+      }, 120);
+    }, []);
 
   const finish = useCallback(() => {
-    if (timer.current) {
-      window.clearInterval(timer.current);
-      timer.current = null;
-    }
+  if (timer.current) {
+    window.clearInterval(timer.current);
+    timer.current = null;
+  }
 
+  queueMicrotask(() => {
     setProgress(100);
+  });
 
-    hideTimer.current = window.setTimeout(() => {
-      setVisible(false);
-      setProgress(0);
-    }, 240);
-  }, []);
+  hideTimer.current = window.setTimeout(() => {
+    setVisible(false);
+    setProgress(0);
+  }, 240);
+}, []);
 
   const beginWork = useCallback(() => {
     inflight.current += 1;
