@@ -2,17 +2,17 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { 
-  FaPenFancy, 
-  FaBook, 
-  FaMagic, 
-  FaPalette, 
-  FaRocket, 
-  FaUsers, 
-  FaLock, 
-  FaSync, 
-  FaStar, 
-  FaArrowRight, 
+import {
+  FaPenFancy,
+  FaBook,
+  FaMagic,
+  FaPalette,
+  FaRocket,
+  FaUsers,
+  FaLock,
+  FaSync,
+  FaStar,
+  FaArrowRight,
   FaChevronDown,
   FaGoogle,
   FaGithub,
@@ -38,12 +38,12 @@ export default function Home() {
   const [activeTestimonial, setActiveTestimonial] = useState(0);
   const { user, loading, logout } = useAuth();
   const toast = useToast();
-  
+
   const heroRef = useRef(null);
   const featuresRef = useRef(null);
   const howItWorksRef = useRef(null);
   const testimonialsRef = useRef(null);
-  
+
   const heroInView = useInView(heroRef, { once: true });
   const featuresInView = useInView(featuresRef, { once: true, margin: "-100px" });
   const howItWorksInView = useInView(howItWorksRef, { once: true, margin: "-100px" });
@@ -188,10 +188,10 @@ export default function Home() {
         <div className="absolute top-0 -right-4 w-72 h-72 bg-yellow-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-2000"></div>
         <div className="absolute -bottom-8 left-20 w-72 h-72 bg-pink-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-4000"></div>
         <div className="absolute bottom-40 right-20 w-72 h-72 bg-blue-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-6000"></div>
-        
+
         {/* Grid overlay */}
         <div className="absolute inset-0 bg-[url('/grid.svg')] bg-center opacity-5"></div>
-        
+
         {/* Gradient orbs */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-gradient-to-r from-blue-500/5 to-purple-500/5 rounded-full blur-3xl"></div>
       </div>
@@ -200,7 +200,7 @@ export default function Home() {
       <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-xl border-b border-gray-200/50 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.5 }}
@@ -216,7 +216,7 @@ export default function Home() {
             </motion.div>
 
             {/* Desktop Navigation */}
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.1 }}
@@ -235,7 +235,7 @@ export default function Home() {
             </motion.div>
 
             {/* Auth Section */}
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.5 }}
@@ -245,8 +245,8 @@ export default function Home() {
                 <div className="w-20 h-8 sm:w-24 sm:h-8 bg-gray-200 rounded-xl animate-pulse" />
               ) : !user ? (
                 <>
-                  <Link 
-                    href="/login" 
+                  <Link
+                    href="/login"
                     className="hidden sm:inline text-sm sm:text-base text-gray-600 hover:text-blue-600 transition-colors font-medium"
                   >
                     Log in
@@ -273,10 +273,10 @@ export default function Home() {
                       <span className="text-[10px] sm:text-xs text-gray-500">Signed in</span>
                     </div>
                   </div>
-                  <motion.button 
+                  <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                    onClick={handleLogout} 
+                    onClick={handleLogout}
                     className="inline-flex items-center px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-white border border-gray-200 hover:bg-red-50 text-red-600 font-medium text-xs sm:text-sm shadow-sm transition-all"
                   >
                     <span className="hidden sm:inline">Logout</span>
@@ -300,8 +300,8 @@ export default function Home() {
               transition={{ duration: 0.6 }}
               className="w-full lg:w-[55%] text-center lg:text-left"
             >
-              
-              <motion.h1 
+
+              <motion.h1
                 initial={{ opacity: 0, y: 20 }}
                 animate={heroInView ? { opacity: 1, y: 0 } : {}}
                 transition={{ duration: 0.6, delay: 0.3 }}
@@ -318,18 +318,18 @@ export default function Home() {
                   </span>
                 </span>
               </motion.h1>
-              
-              <motion.p 
+
+              <motion.p
                 initial={{ opacity: 0, y: 20 }}
                 animate={heroInView ? { opacity: 1, y: 0 } : {}}
                 transition={{ duration: 0.6, delay: 0.4 }}
                 className="text-sm sm:text-base lg:text-lg text-gray-600 max-w-2xl mx-auto lg:mx-0 mb-5 sm:mb-6"
               >
-                Your all-in-one digital notebook for ideas, drawings, and collaboration. 
+                Your all-in-one digital notebook for ideas, drawings, and collaboration.
                 Perfect for students, professionals, and creative minds.
               </motion.p>
-              
-              <motion.div 
+
+              <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={heroInView ? { opacity: 1, y: 0 } : {}}
                 transition={{ duration: 0.6, delay: 0.5 }}
@@ -351,7 +351,7 @@ export default function Home() {
               </motion.div>
 
               {/* Social Proof */}
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0 }}
                 animate={heroInView ? { opacity: 1 } : {}}
                 transition={{ duration: 0.6, delay: 0.6 }}
@@ -396,9 +396,9 @@ export default function Home() {
                     sizes="(max-width: 640px) 90vw, (max-width: 1024px) 80vw, 45vw"
                   />
                 </div>
-                
+
                 {/* Floating UI Elements - Adjusted for mobile */}
-                <motion.div 
+                <motion.div
                   animate={{ y: [-3, 3] }}
                   transition={{ duration: 4, repeat: Infinity, repeatType: "reverse" }}
                   className="absolute top-2 sm:top-4 left-2 sm:left-4 bg-white/95 backdrop-blur rounded-md sm:rounded-lg px-2 sm:px-3 py-1 sm:py-2 shadow-md sm:shadow-lg border border-gray-200 flex items-center gap-1 sm:gap-2"
@@ -406,8 +406,8 @@ export default function Home() {
                   <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-green-500 rounded-full"></div>
                   <span className="text-[10px] sm:text-xs font-medium">AI Processing</span>
                 </motion.div>
-                
-                <motion.div 
+
+                <motion.div
                   animate={{ y: [3, -3] }}
                   transition={{ duration: 5, repeat: Infinity, repeatType: "reverse", delay: 1 }}
                   className="absolute bottom-2 sm:bottom-4 right-2 sm:right-4 bg-white/95 backdrop-blur rounded-md sm:rounded-lg px-2 sm:px-3 py-1 sm:py-2 shadow-md sm:shadow-lg border border-gray-200 flex items-center gap-1 sm:gap-2"
@@ -416,10 +416,10 @@ export default function Home() {
                   <span className="text-[10px] sm:text-xs font-medium">Synced</span>
                 </motion.div>
               </div>
-              
+
               {/* Stats Cards - Hidden on mobile, visible on desktop */}
               <div className="absolute -bottom-6 -left-6 hidden lg:block">
-                <motion.div 
+                <motion.div
                   animate={{ y: [-3, 3] }}
                   transition={{ duration: 3, repeat: Infinity, repeatType: "reverse" }}
                   className="bg-white rounded-xl shadow-xl p-4 border border-gray-200"
@@ -440,7 +440,7 @@ export default function Home() {
         </div>
 
         {/* Scroll Indicator - Adjusted position */}
-        <motion.div 
+        <motion.div
           animate={{ y: [0, 8, 0] }}
           transition={{ duration: 2, repeat: Infinity }}
           className="absolute bottom-2 sm:bottom-4 left-1/2 transform -translate-x-1/2"
@@ -497,7 +497,7 @@ export default function Home() {
               From simple notes to complex diagrams, we&apos;ve got you covered
             </p>
           </motion.div>
-          
+
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 lg:gap-6">
             {features.map((feature, index) => (
               <motion.div
@@ -517,9 +517,9 @@ export default function Home() {
                   </div>
                   <h3 className="text-base sm:text-lg lg:text-xl xl:text-2xl font-bold mb-1.5 sm:mb-2 lg:mb-3 text-gray-800">{feature.title}</h3>
                   <p className="text-xs sm:text-sm lg:text-base text-gray-600 leading-relaxed">{feature.description}</p>
-                  
+
                   {/* Hover Indicator */}
-                  <motion.div 
+                  <motion.div
                     animate={{ width: hoveredFeature === index ? '100%' : '0%' }}
                     className="absolute bottom-0 left-0 h-0.5 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full"
                   />
@@ -550,11 +550,11 @@ export default function Home() {
               </span>
             </h2>
           </motion.div>
-          
+
           <div className="grid lg:grid-cols-3 gap-6 sm:gap-8 lg:gap-12 relative">
             {/* Connecting Line - Hidden on mobile */}
             <div className="hidden lg:block absolute top-20 left-0 w-full h-0.5 bg-gradient-to-r from-blue-200 via-purple-200 to-pink-200"></div>
-            
+
             {[
               {
                 step: "01",
@@ -621,7 +621,7 @@ export default function Home() {
               </span>
             </h2>
           </motion.div>
-          
+
           {/* Desktop Grid - Hidden on mobile */}
           <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
             {testimonials.map((testimonial, index) => (
@@ -652,7 +652,7 @@ export default function Home() {
               </motion.div>
             ))}
           </div>
-          
+
           {/* Mobile Carousel */}
           <div className="md:hidden">
             <AnimatePresence mode="wait">
@@ -684,18 +684,17 @@ export default function Home() {
                 </div>
               </motion.div>
             </AnimatePresence>
-            
+
             {/* Carousel Indicators */}
             <div className="flex justify-center gap-2 mt-4 sm:mt-6">
               {testimonials.map((_, index) => (
                 <button
                   key={index}
                   onClick={() => setActiveTestimonial(index)}
-                  className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full transition-all duration-300 ${
-                    index === activeTestimonial 
-                      ? 'w-4 sm:w-6 bg-gradient-to-r from-blue-600 to-purple-600' 
+                  className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full transition-all duration-300 ${index === activeTestimonial
+                      ? 'w-4 sm:w-6 bg-gradient-to-r from-blue-600 to-purple-600'
                       : 'bg-gray-300'
-                  }`}
+                    }`}
                 />
               ))}
             </div>
@@ -717,7 +716,7 @@ export default function Home() {
             <div className="absolute inset-0 bg-grid-white/10"></div>
             <div className="absolute -top-40 -right-40 w-80 h-80 bg-white/20 rounded-full blur-3xl"></div>
             <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-white/20 rounded-full blur-3xl"></div>
-            
+
             <div className="relative text-center text-white">
               <motion.div
                 animate={{ rotate: [0, 10, -10, 0] }}
@@ -726,17 +725,17 @@ export default function Home() {
               >
                 <FaCrown className="w-5 h-5 sm:w-6 sm:h-6 lg:w-8 lg:h-8" />
               </motion.div>
-              
+
               <h2 className="text-xl sm:text-2xl lg:text-3xl xl:text-4xl 2xl:text-5xl font-bold mb-2 sm:mb-3 lg:mb-4">
                 Ready to Transform Your
                 <span className="block mt-1 sm:mt-2 text-yellow-300">Note-Taking?</span>
               </h2>
-              
+
               <p className="text-sm sm:text-base lg:text-lg text-blue-100 mb-5 sm:mb-6 lg:mb-8 max-w-2xl mx-auto px-4">
                 Join thousands of creators who have made NoteVerse their go-to note-taking solution.
                 <span className="block mt-1 sm:mt-2 font-semibold text-white">Free forever for personal use.</span>
               </p>
-              
+
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
                 <Link
                   href="/signup"
@@ -752,7 +751,7 @@ export default function Home() {
                   Explore Features
                 </Link>
               </div>
-              
+
               <p className="text-[10px] sm:text-xs lg:text-sm text-blue-200 mt-4 sm:mt-5 lg:mt-6">
                 ✨ No credit card required • 14-day free trial • Cancel anytime
               </p>
@@ -777,7 +776,7 @@ export default function Home() {
                 </span>
               </div>
               <p className="text-gray-400 text-xs sm:text-sm leading-relaxed mb-4 sm:mb-5 lg:mb-6 max-w-md">
-                The all-in-one note-taking universe for thinkers, creators, and visual minds. 
+                The all-in-one note-taking universe for thinkers, creators, and visual minds.
                 Capture ideas, bring them to life.
               </p>
               <div className="flex items-center gap-3 sm:gap-4">
@@ -788,7 +787,7 @@ export default function Home() {
                 ))}
               </div>
             </div>
-            
+
             {/* Links */}
             <div className="col-span-1 lg:col-span-3">
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
@@ -801,7 +800,7 @@ export default function Home() {
                     <li><Link href="/changelog" className="hover:text-white transition-colors">Changelog</Link></li>
                   </ul>
                 </div>
-                
+
                 <div>
                   <h4 className="font-bold mb-3 sm:mb-4 text-xs sm:text-sm">Company</h4>
                   <ul className="space-y-1.5 sm:space-y-2 lg:space-y-3 text-xs sm:text-sm text-gray-400">
@@ -811,7 +810,7 @@ export default function Home() {
                     <li><Link href="/contact" className="hover:text-white transition-colors">Contact</Link></li>
                   </ul>
                 </div>
-                
+
                 <div>
                   <h4 className="font-bold mb-3 sm:mb-4 text-xs sm:text-sm">Legal</h4>
                   <ul className="space-y-1.5 sm:space-y-2 lg:space-y-3 text-xs sm:text-sm text-gray-400">
@@ -824,7 +823,7 @@ export default function Home() {
               </div>
             </div>
           </div>
-          
+
           <div className="border-t border-gray-800 mt-8 sm:mt-10 lg:mt-12 pt-5 sm:pt-6 lg:pt-8 text-center">
             <p className="text-xs sm:text-sm text-gray-400">
               © {new Date().getFullYear()} NoteVerse. All rights reserved.

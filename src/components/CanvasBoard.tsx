@@ -3,8 +3,8 @@
 import { Stage, Layer, Line, Text, Circle, Rect, Arrow, Group, Image as KonvaImage, Transformer } from 'react-konva';
 import { useState, useRef, useEffect, useCallback, memo } from 'react';
 import { Button } from '@/components/custom/button';
-import { 
-  FaPen, FaEraser, FaFont, FaTrash, FaPlus, FaArrowLeft, FaArrowRight, 
+import {
+  FaPen, FaEraser, FaFont, FaTrash, FaPlus, FaArrowLeft, FaArrowRight,
   FaUndo, FaRedo, FaMinus, FaShapes, FaMousePointer, FaSquare, FaCircle,
   FaLongArrowAltRight, FaHighlighter, FaPalette, FaExpand, FaCompress,
   FaDownload, FaBars, FaTimes, FaShare, FaBold, FaItalic, FaAlignRight,
@@ -225,9 +225,9 @@ export default function CanvasBoard({ noteId, isReadOnly = false }: { noteId: st
   const currentStickyNotes = (stickyNotes && stickyNotes[pageIndex]) || [];
 
   const getExportBackground = () => {
-      // Always use white background for export to ensure visibility
-      return '#ffffff';
-    };  
+    // Always use white background for export to ensure visibility
+    return '#ffffff';
+  };
 
   const getPointerPosition = (stage: Konva.Stage) => {
     const pointer = stage.getPointerPosition();
@@ -271,7 +271,7 @@ export default function CanvasBoard({ noteId, isReadOnly = false }: { noteId: st
         underline: textUnderline,
         width: 300,
       };
-      
+
       const updated = [...textBoxes];
       updated[pageIndex] = [...currentTextBoxes, newTextBox];
       setCanvasData(prev => ({ ...prev, textBoxes: updated }));
@@ -287,7 +287,7 @@ export default function CanvasBoard({ noteId, isReadOnly = false }: { noteId: st
 
   const handleStickyEdit = useCallback(() => {
     if (!editingSticky) return;
-    
+
     pushHistory();
     const updated = [...stickyNotes];
     updated[pageIndex] = currentStickyNotes.map(s =>
@@ -305,7 +305,7 @@ export default function CanvasBoard({ noteId, isReadOnly = false }: { noteId: st
 
   const deleteStickyNote = useCallback((stickyId: string) => {
     if (isReadOnlyMode || isReadOnly) return;
-    
+
     pushHistory();
     const updated = [...stickyNotes];
     updated[pageIndex] = currentStickyNotes.filter(s => s.id !== stickyId);
@@ -422,12 +422,12 @@ export default function CanvasBoard({ noteId, isReadOnly = false }: { noteId: st
   }, [loading, pushHistory, isReadOnlyMode, isReadOnly, history.length]);
 
   useEffect(() => {
-  return () => {
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
-    }
-  };
-}, []);
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, []);
 
   // ============================================================================
   // HISTORY FUNCTIONS
@@ -505,15 +505,15 @@ export default function CanvasBoard({ noteId, isReadOnly = false }: { noteId: st
           case 'y': e.preventDefault(); redo(); break;
           case 's': e.preventDefault(); syncToServer(); break;
           case 'Delete':
-           {
-            if (selectedElement) {
-              e.preventDefault();
-              if (selectedElement.type === 'sticky') {
-                deleteStickyNote(selectedElement.id);
+            {
+              if (selectedElement) {
+                e.preventDefault();
+                if (selectedElement.type === 'sticky') {
+                  deleteStickyNote(selectedElement.id);
+                }
               }
+              break;
             }
-            break;
-          }
         }
       } else {
         switch (e.key) {
@@ -526,12 +526,12 @@ export default function CanvasBoard({ noteId, isReadOnly = false }: { noteId: st
           case 's': setMode('select'); break;
           case 'Escape': setSelectedElement(null); break;
           case 'Delete':
-           {
-            if (selectedElement && selectedElement.type === 'sticky') {
-              deleteStickyNote(selectedElement.id);
+            {
+              if (selectedElement && selectedElement.type === 'sticky') {
+                deleteStickyNote(selectedElement.id);
+              }
+              break;
             }
-            break;
-          }
         }
       }
     };
@@ -605,63 +605,63 @@ export default function CanvasBoard({ noteId, isReadOnly = false }: { noteId: st
   };
 
   const handleMouseMove = (e: KonvaMouseEvent) => {
-  if (isReadOnlyMode || isReadOnly) return;
-  if (!isDrawing.current && mode !== 'shape') return;
+    if (isReadOnlyMode || isReadOnly) return;
+    if (!isDrawing.current && mode !== 'shape') return;
 
-  const stage = e.target.getStage();
-  if (!stage) return;
-  const pos = getPointerPosition(stage);
-  if (!pos) return;
+    const stage = e.target.getStage();
+    if (!stage) return;
+    const pos = getPointerPosition(stage);
+    if (!pos) return;
 
-  if (isDrawing.current && (mode === 'pen' || mode === 'pencil' || mode === 'highlighter' || mode === 'eraser')) {
-    // Throttle updates using requestAnimationFrame
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
+    if (isDrawing.current && (mode === 'pen' || mode === 'pencil' || mode === 'highlighter' || mode === 'eraser')) {
+      // Throttle updates using requestAnimationFrame
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+
+      animationFrameRef.current = requestAnimationFrame(() => {
+        const updated = [...lines];
+        const current = [...currentLines];
+        if (current.length === 0) return;
+        const lastLine = { ...current[current.length - 1] };
+        lastLine.points = [...lastLine.points, pos.x, pos.y];
+        current[current.length - 1] = lastLine;
+        updated[pageIndex] = current;
+        setCanvasData(prev => ({ ...prev, lines: updated }));
+      });
+    } else if (mode === 'shape' && shapeStart.current) {
+      const start = shapeStart.current;
+      const x = Math.min(start.x, pos.x);
+      const y = Math.min(start.y, pos.y);
+      const width = Math.abs(pos.x - start.x);
+      const height = Math.abs(pos.y - start.y);
+
+      setPreviewShape({
+        type: selectedShape,
+        x,
+        y,
+        width: Math.max(width, 1),
+        height: Math.max(height, 1),
+        id: 'preview',
+        fill: 'rgba(0,0,0,0.1)',
+        stroke: penColor,
+        strokeWidth: 2,
+        rotation: 0
+      });
     }
-    
-    animationFrameRef.current = requestAnimationFrame(() => {
-      const updated = [...lines];
-      const current = [...currentLines];
-      if (current.length === 0) return;
-      const lastLine = { ...current[current.length - 1] };
-      lastLine.points = [...lastLine.points, pos.x, pos.y];
-      current[current.length - 1] = lastLine;
-      updated[pageIndex] = current;
-      setCanvasData(prev => ({ ...prev, lines: updated }));
-    });
-  } else if (mode === 'shape' && shapeStart.current) {
-    const start = shapeStart.current;
-    const x = Math.min(start.x, pos.x);
-    const y = Math.min(start.y, pos.y);
-    const width = Math.abs(pos.x - start.x);
-    const height = Math.abs(pos.y - start.y);
+  };
 
-    setPreviewShape({
-      type: selectedShape,
-      x,
-      y,
-      width: Math.max(width, 1),
-      height: Math.max(height, 1),
-      id: 'preview',
-      fill: 'rgba(0,0,0,0.1)',
-      stroke: penColor,
-      strokeWidth: 2,
-      rotation: 0
-    });
-  }
-};
-
-// Helper function to update drawing
-const updateDrawing = (pos: { x: number; y: number }) => {
-  const updated = [...lines];
-  const current = [...currentLines];
-  if (current.length === 0) return;
-  const lastLine = { ...current[current.length - 1] };
-  lastLine.points = [...lastLine.points, pos.x, pos.y];
-  current[current.length - 1] = lastLine;
-  updated[pageIndex] = current;
-  setCanvasData(prev => ({ ...prev, lines: updated }));
-};
+  // Helper function to update drawing
+  const updateDrawing = (pos: { x: number; y: number }) => {
+    const updated = [...lines];
+    const current = [...currentLines];
+    if (current.length === 0) return;
+    const lastLine = { ...current[current.length - 1] };
+    lastLine.points = [...lastLine.points, pos.x, pos.y];
+    current[current.length - 1] = lastLine;
+    updated[pageIndex] = current;
+    setCanvasData(prev => ({ ...prev, lines: updated }));
+  };
 
   const handleMouseUp = () => {
     if (isReadOnlyMode || isReadOnly) return;
@@ -809,100 +809,100 @@ const updateDrawing = (pos: { x: number; y: number }) => {
   // ============================================================================
 
   const exportCanvas = async (format: 'png' | 'jpg' | 'pdf') => {
-  console.log('Exporting PDF...');
-  
-  const stage = stageRef.current;
-  if (!stage) {
-    toast.error({ title: "Export failed", description: "Canvas not ready" });
-    return;
-  }
+    console.log('Exporting PDF...');
 
-  setIsExporting(true);
-
-  try {
-    // Import jsPDF differently to avoid build issues
-    const jsPDFModule = await import('jspdf');
-    const jsPDF = jsPDFModule.default || jsPDFModule.jsPDF;
-    
-    if (!jsPDF) {
-      throw new Error('jsPDF library not loaded properly');
-    }
-    
-    // Get all pages
-    const totalPages = lines.length;
-    const currentPage = pageIndex;
-    
-    // Create PDF with first page size
-    const pdf = new jsPDF({
-      orientation: 'landscape',
-      unit: 'px',
-      format: [stageSize.width, stageSize.height]
-    });
-
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pdfHeight = pdf.internal.pageSize.getHeight();
-
-    // Collect data URLs for all pages
-    const pageDataUrls: string[] = [];
-    
-    // Save current state
-    const originalScale = scale;
-    const originalPos = { ...stagePos };
-    const originalBg = background;
-    
-    // Set white background for export
-    setCanvasData(prev => ({ ...prev, background: '#ffffff' }));
-    await new Promise(resolve => setTimeout(resolve, 200));
-    
-    // Reset view to show full page
-    setScale(1);
-    setStagePos({ x: 0, y: 0 });
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
-    for (let i = 0; i < totalPages; i++) {
-      // Switch to page
-      setPageIndex(i);
-      await new Promise(resolve => setTimeout(resolve, 400));
-      
-      // Capture the page with white background
-      const pageData = stage.toDataURL({
-        mimeType: 'image/png',
-        quality: 1,
-        pixelRatio: 2
-      });
-      pageDataUrls.push(pageData);
+    const stage = stageRef.current;
+    if (!stage) {
+      toast.error({ title: "Export failed", description: "Canvas not ready" });
+      return;
     }
 
-    // Restore original view
-    setPageIndex(currentPage);
-    setScale(originalScale);
-    setStagePos(originalPos);
-    setCanvasData(prev => ({ ...prev, background: originalBg }));
-    await new Promise(resolve => setTimeout(resolve, 200));
+    setIsExporting(true);
 
-    // Add all pages to PDF
-    for (let i = 0; i < pageDataUrls.length; i++) {
-      if (i > 0) {
-        pdf.addPage([pdfWidth, pdfHeight]);
+    try {
+      // Import jsPDF differently to avoid build issues
+      const jsPDFModule = await import('jspdf');
+      const jsPDF = jsPDFModule.default || jsPDFModule.jsPDF;
+
+      if (!jsPDF) {
+        throw new Error('jsPDF library not loaded properly');
       }
-      pdf.addImage(pageDataUrls[i], 'PNG', 0, 0, pdfWidth, pdfHeight);
-    }
 
-    pdf.save(`canvas-${noteId}-${Date.now()}.pdf`);
-    toast.success({ 
-      title: `PDF exported successfully!`, 
-      description: `${totalPages} page${totalPages > 1 ? 's' : ''} exported` 
-    });
-  } catch (error) {
-    console.error('Export failed:', error);
-    toast.error({ 
-      title: "Export failed", 
-      description: error instanceof Error ? error.message : "Please try again" 
-    });
-  } finally {
-    setIsExporting(false);
-  }
-};
+      // Get all pages
+      const totalPages = lines.length;
+      const currentPage = pageIndex;
+
+      // Create PDF with first page size
+      const pdf = new jsPDF({
+        orientation: 'landscape',
+        unit: 'px',
+        format: [stageSize.width, stageSize.height]
+      });
+
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+
+      // Collect data URLs for all pages
+      const pageDataUrls: string[] = [];
+
+      // Save current state
+      const originalScale = scale;
+      const originalPos = { ...stagePos };
+      const originalBg = background;
+
+      // Set white background for export
+      setCanvasData(prev => ({ ...prev, background: '#ffffff' }));
+      await new Promise(resolve => setTimeout(resolve, 200));
+
+      // Reset view to show full page
+      setScale(1);
+      setStagePos({ x: 0, y: 0 });
+      await new Promise(resolve => setTimeout(resolve, 300));
+
+      for (let i = 0; i < totalPages; i++) {
+        // Switch to page
+        setPageIndex(i);
+        await new Promise(resolve => setTimeout(resolve, 400));
+
+        // Capture the page with white background
+        const pageData = stage.toDataURL({
+          mimeType: 'image/png',
+          quality: 1,
+          pixelRatio: 2
+        });
+        pageDataUrls.push(pageData);
+      }
+
+      // Restore original view
+      setPageIndex(currentPage);
+      setScale(originalScale);
+      setStagePos(originalPos);
+      setCanvasData(prev => ({ ...prev, background: originalBg }));
+      await new Promise(resolve => setTimeout(resolve, 200));
+
+      // Add all pages to PDF
+      for (let i = 0; i < pageDataUrls.length; i++) {
+        if (i > 0) {
+          pdf.addPage([pdfWidth, pdfHeight]);
+        }
+        pdf.addImage(pageDataUrls[i], 'PNG', 0, 0, pdfWidth, pdfHeight);
+      }
+
+      pdf.save(`canvas-${noteId}-${Date.now()}.pdf`);
+      toast.success({
+        title: `PDF exported successfully!`,
+        description: `${totalPages} page${totalPages > 1 ? 's' : ''} exported`
+      });
+    } catch (error) {
+      console.error('Export failed:', error);
+      toast.error({
+        title: "Export failed",
+        description: error instanceof Error ? error.message : "Please try again"
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   // ============================================================================
   // FULLSCREEN
@@ -955,103 +955,103 @@ const updateDrawing = (pos: { x: number; y: number }) => {
   };
 
   const renderStickyNote = (sticky: StickyNoteData) => {
-  const isPlaceholder = sticky.text === '';
-  const isSelected = selectedElement?.type === 'sticky' && selectedElement.id === sticky.id;
-  
-  return (
-    <Group
-      key={sticky.id}
-      x={sticky.x}
-      y={sticky.y}
-      draggable={mode === 'select' && !isReadOnlyMode && !isReadOnly}
-      onClick={() => {
-        if (mode === 'select') {
-          setSelectedElement({ type: 'sticky', id: sticky.id });
-        }
-      }}
-      onDblClick={() => {
-        if (finalReadOnly) return;
-        setEditingSticky({ id: sticky.id, text: sticky.text });
-      }}
-      onDragEnd={(e) => {
-        if (isReadOnlyMode || isReadOnly) return;
-        const updated = [...stickyNotes];
-        updated[pageIndex] = currentStickyNotes.map(s =>
-          s.id === sticky.id ? { ...s, x: e.target.x(), y: e.target.y() } : s
-        );
-        setCanvasData(prev => ({ ...prev, stickyNotes: updated }));
-      }}
-    >
-      <Rect
-        width={sticky.width}
-        height={sticky.height}
-        fill={sticky.color}
-        cornerRadius={6}
-        shadowColor="rgba(0,0,0,0.15)"
-        shadowBlur={8}
-        shadowOffsetX={2}
-        shadowOffsetY={4}
-        stroke={isSelected ? '#3b82f6' : undefined}
-        strokeWidth={isSelected ? 2 : 0}
-      />
-      <Text
-        x={10}
-        y={10}
-        width={sticky.width - 20}
-        height={sticky.height - 20}
-        text={isPlaceholder ? 'Double click to edit..' : sticky.text}
-        fontSize={isPlaceholder ? 12 : 14}
-        fontFamily="Inter"
-        fill={isPlaceholder ? '#333' : '#1a1a1a'}
-        wrap="word"
-        fontStyle={isPlaceholder ? 'italic' : 'normal'}
-      />
-      
-      {/* Delete button - rendered as Konva Text with click handler */}
-      {!finalReadOnly && mode === 'select' && isSelected && (
-        <Group
-          x={sticky.width - 20}
-          y={-10}
-          onClick={(e) => {
-            e.cancelBubble = true;
-            deleteStickyNote(sticky.id);
-          }}
-        >
-          <Circle
-            x={0}
-            y={0}
-            radius={12}
-            fill="#ef4444"
-            shadowColor="rgba(0,0,0,0.2)"
-            shadowBlur={4}
-          />
-          <Text
-            x={-4}
-            y={-6}
-            text="✕"
-            fontSize={14}
-            fontFamily="Arial"
-            fill="#ffffff"
-            fontStyle="bold"
-          />
-        </Group>
-      )}
-      
-      {/* Pencil icon - always show when in select mode */}
-      {!finalReadOnly && mode === 'select' && (
-        <Text
-          x={sticky.width - 30}
-          y={sticky.height - 25}
-          text="✏️"
-          fontSize={16}
-          fontFamily="Inter"
-          fill="#666"
-          opacity={0.6}
+    const isPlaceholder = sticky.text === '';
+    const isSelected = selectedElement?.type === 'sticky' && selectedElement.id === sticky.id;
+
+    return (
+      <Group
+        key={sticky.id}
+        x={sticky.x}
+        y={sticky.y}
+        draggable={mode === 'select' && !isReadOnlyMode && !isReadOnly}
+        onClick={() => {
+          if (mode === 'select') {
+            setSelectedElement({ type: 'sticky', id: sticky.id });
+          }
+        }}
+        onDblClick={() => {
+          if (finalReadOnly) return;
+          setEditingSticky({ id: sticky.id, text: sticky.text });
+        }}
+        onDragEnd={(e) => {
+          if (isReadOnlyMode || isReadOnly) return;
+          const updated = [...stickyNotes];
+          updated[pageIndex] = currentStickyNotes.map(s =>
+            s.id === sticky.id ? { ...s, x: e.target.x(), y: e.target.y() } : s
+          );
+          setCanvasData(prev => ({ ...prev, stickyNotes: updated }));
+        }}
+      >
+        <Rect
+          width={sticky.width}
+          height={sticky.height}
+          fill={sticky.color}
+          cornerRadius={6}
+          shadowColor="rgba(0,0,0,0.15)"
+          shadowBlur={8}
+          shadowOffsetX={2}
+          shadowOffsetY={4}
+          stroke={isSelected ? '#3b82f6' : undefined}
+          strokeWidth={isSelected ? 2 : 0}
         />
-      )}
-    </Group>
-  );
-};
+        <Text
+          x={10}
+          y={10}
+          width={sticky.width - 20}
+          height={sticky.height - 20}
+          text={isPlaceholder ? 'Double click to edit..' : sticky.text}
+          fontSize={isPlaceholder ? 12 : 14}
+          fontFamily="Inter"
+          fill={isPlaceholder ? '#333' : '#1a1a1a'}
+          wrap="word"
+          fontStyle={isPlaceholder ? 'italic' : 'normal'}
+        />
+
+        {/* Delete button - rendered as Konva Text with click handler */}
+        {!finalReadOnly && mode === 'select' && isSelected && (
+          <Group
+            x={sticky.width - 20}
+            y={-10}
+            onClick={(e) => {
+              e.cancelBubble = true;
+              deleteStickyNote(sticky.id);
+            }}
+          >
+            <Circle
+              x={0}
+              y={0}
+              radius={12}
+              fill="#ef4444"
+              shadowColor="rgba(0,0,0,0.2)"
+              shadowBlur={4}
+            />
+            <Text
+              x={-4}
+              y={-6}
+              text="✕"
+              fontSize={14}
+              fontFamily="Arial"
+              fill="#ffffff"
+              fontStyle="bold"
+            />
+          </Group>
+        )}
+
+        {/* Pencil icon - always show when in select mode */}
+        {!finalReadOnly && mode === 'select' && (
+          <Text
+            x={sticky.width - 30}
+            y={sticky.height - 25}
+            text="✏️"
+            fontSize={16}
+            fontFamily="Inter"
+            fill="#666"
+            opacity={0.6}
+          />
+        )}
+      </Group>
+    );
+  };
 
   // ============================================================================
   // TOOL DEFINITIONS
@@ -1140,13 +1140,13 @@ const updateDrawing = (pos: { x: number; y: number }) => {
       <header className="flex items-center justify-between px-4 py-3 bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl border-b border-gray-200 dark:border-gray-800 shadow-sm">
         {/* Left Section */}
         <div className="flex items-center gap-4">
-          <button 
-            onClick={() => setShowMobileMenu(!showMobileMenu)} 
+          <button
+            onClick={() => setShowMobileMenu(!showMobileMenu)}
             className="md:hidden p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors"
           >
             {showMobileMenu ? <FaTimes className="w-6 h-6" /> : <FaBars className="w-6 h-6" />}
           </button>
-          
+
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/25">
               <span className="text-white font-bold text-lg">NV</span>
@@ -1158,23 +1158,23 @@ const updateDrawing = (pos: { x: number; y: number }) => {
           </div>
 
           <div className="hidden md:flex items-center gap-2 ml-4">
-            <button 
-              onClick={undo} 
+            <button
+              onClick={undo}
               disabled={historyIndex <= 0 || finalReadOnly || isExporting}
               className="h-10 w-10 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center transition-all disabled:opacity-40"
             >
               <FaUndo className="w-5 h-5" />
             </button>
-            <button 
-              onClick={redo} 
+            <button
+              onClick={redo}
               disabled={historyIndex >= history.length - 1 || finalReadOnly || isExporting}
               className="h-10 w-10 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center transition-all disabled:opacity-40"
             >
               <FaRedo className="w-5 h-5" />
             </button>
             <div className="w-px h-8 bg-gray-200 dark:bg-gray-700 mx-1" />
-            <button 
-              onClick={() => setShowGrid(!showGrid)} 
+            <button
+              onClick={() => setShowGrid(!showGrid)}
               className={`h-10 w-10 rounded-xl flex items-center justify-center transition-all ${showGrid ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' : 'hover:bg-gray-100 dark:hover:bg-gray-800'}`}
             >
               <FiGrid className="w-5 h-5" />
@@ -1184,40 +1184,38 @@ const updateDrawing = (pos: { x: number; y: number }) => {
 
         {/* Center - Save Status */}
         <div className="hidden md:flex items-center gap-2">
-          <div className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-sm ${
-            saveStatus === 'saved' ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400' :
-            saveStatus === 'saving' ? 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400' :
-            'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'
-          }`}>
-            <div className={`w-2 h-2 rounded-full ${
-              saveStatus === 'saved' ? 'bg-green-500' :
-              saveStatus === 'saving' ? 'bg-yellow-500 animate-pulse' :
-              'bg-red-500'
-            }`} />
+          <div className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-sm ${saveStatus === 'saved' ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400' :
+              saveStatus === 'saving' ? 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400' :
+                'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'
+            }`}>
+            <div className={`w-2 h-2 rounded-full ${saveStatus === 'saved' ? 'bg-green-500' :
+                saveStatus === 'saving' ? 'bg-yellow-500 animate-pulse' :
+                  'bg-red-500'
+              }`} />
             {saveStatus === 'saved' ? '✓ Saved' : saveStatus === 'saving' ? 'Saving...' : '⚠ Error'}
           </div>
         </div>
 
         {/* Right Section */}
         <div className="flex items-center gap-2">
-          <button 
-            onClick={() => setTheme(prev => prev === 'light' ? 'dark' : 'light')} 
+          <button
+            onClick={() => setTheme(prev => prev === 'light' ? 'dark' : 'light')}
             className="h-10 w-10 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center transition-all"
           >
             {theme === 'light' ? <FaRegMoon className="w-5 h-5" /> : <FaRegSun className="w-5 h-5" />}
           </button>
-          
-          <button 
-            onClick={() => setShowShare(true)} 
+
+          <button
+            onClick={() => setShowShare(true)}
             className="hidden sm:flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl hover:shadow-lg hover:shadow-blue-500/25 transition-all text-sm font-medium"
           >
             <FaShare className="w-4 h-4" />
             Share
           </button>
-          
+
           {/* EXPORT BUTTON - FIXED */}
           <div className="relative">
-            <button 
+            <button
               onClick={() => exportCanvas('pdf')}
               disabled={isExporting}
               className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-all text-sm font-medium disabled:opacity-50"
@@ -1226,16 +1224,16 @@ const updateDrawing = (pos: { x: number; y: number }) => {
               {isExporting ? 'Exporting...' : `Export PDF`}
             </button>
           </div>
-        
-          <button 
-            onClick={toggleFullscreen} 
+
+          <button
+            onClick={toggleFullscreen}
             className="hidden md:flex h-10 w-10 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 items-center justify-center transition-all"
           >
             {isFullscreen ? <FiMinimize className="w-5 h-5" /> : <FiMaximize className="w-5 h-5" />}
           </button>
-        
-          <button 
-            onClick={() => setShowToolbar(!showToolbar)} 
+
+          <button
+            onClick={() => setShowToolbar(!showToolbar)}
             className="hidden md:flex h-10 w-10 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 items-center justify-center transition-all"
           >
             {showToolbar ? <FaCompress className="w-5 h-5" /> : <FaExpand className="w-5 h-5" />}
@@ -1247,7 +1245,7 @@ const updateDrawing = (pos: { x: number; y: number }) => {
       <div className="flex flex-1 overflow-hidden" ref={containerRef}>
         {/* ===== LEFT TOOLBAR - LARGER ICONS ===== */}
         {showToolbar && !finalReadOnly && (
-          <motion.div 
+          <motion.div
             initial={{ x: -280, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: -280, opacity: 0 }}
@@ -1259,11 +1257,10 @@ const updateDrawing = (pos: { x: number; y: number }) => {
                 <button
                   key={tool.mode}
                   onClick={() => setMode(tool.mode)}
-                  className={`relative w-14 h-14 rounded-2xl flex flex-col items-center justify-center transition-all duration-200 group ${
-                    mode === tool.mode 
-                      ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/30 scale-105' 
+                  className={`relative w-14 h-14 rounded-2xl flex flex-col items-center justify-center transition-all duration-200 group ${mode === tool.mode
+                      ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/30 scale-105'
                       : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300'
-                  }`}
+                    }`}
                 >
                   {tool.icon}
                   <span className="text-[9px] mt-0.5 font-medium">{tool.label}</span>
@@ -1279,7 +1276,7 @@ const updateDrawing = (pos: { x: number; y: number }) => {
 
               {/* Color Picker */}
               <div className="relative">
-                <button 
+                <button
                   className="w-12 h-12 rounded-2xl border-2 border-gray-300 dark:border-gray-600 overflow-hidden hover:scale-105 transition-all"
                   onClick={() => document.getElementById('color-picker')?.click()}
                 >
@@ -1296,14 +1293,14 @@ const updateDrawing = (pos: { x: number; y: number }) => {
 
               {/* Size Control */}
               <div className="flex flex-col items-center gap-1 mt-2">
-                <button 
+                <button
                   onClick={() => setPenSize(prev => Math.min(20, prev + 1))}
                   className="w-10 h-10 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center text-gray-600 dark:text-gray-400 transition-all"
                 >
                   <FiPlus className="w-5 h-5" />
                 </button>
                 <span className="text-sm font-semibold text-gray-700 dark:text-gray-300 min-w-[24px] text-center">{penSize}</span>
-                <button 
+                <button
                   onClick={() => setPenSize(prev => Math.max(1, prev - 1))}
                   className="w-10 h-10 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center text-gray-600 dark:text-gray-400 transition-all"
                 >
@@ -1317,9 +1314,8 @@ const updateDrawing = (pos: { x: number; y: number }) => {
                   <button
                     key={color}
                     onClick={() => setPenColor(color)}
-                    className={`w-3.5 h-3.5 rounded-full border border-gray-300 dark:border-gray-600 transition-all hover:scale-110 ${
-                      penColor === color ? 'ring-2 ring-blue-500 ring-offset-1' : ''
-                    }`}
+                    className={`w-3.5 h-3.5 rounded-full border border-gray-300 dark:border-gray-600 transition-all hover:scale-110 ${penColor === color ? 'ring-2 ring-blue-500 ring-offset-1' : ''
+                      }`}
                     style={{ backgroundColor: color }}
                   />
                 ))}
@@ -1330,7 +1326,7 @@ const updateDrawing = (pos: { x: number; y: number }) => {
 
         {/* ===== SHAPE TOOLBAR ===== */}
         {showToolbar && !finalReadOnly && mode === 'shape' && (
-          <motion.div 
+          <motion.div
             initial={{ y: -50, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: -50, opacity: 0 }}
@@ -1340,11 +1336,10 @@ const updateDrawing = (pos: { x: number; y: number }) => {
               <button
                 key={shape.type}
                 onClick={() => setSelectedShape(shape.type)}
-                className={`p-2.5 rounded-xl transition-all ${
-                  selectedShape === shape.type 
-                    ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/25' 
+                className={`p-2.5 rounded-xl transition-all ${selectedShape === shape.type
+                    ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/25'
                     : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400'
-                }`}
+                  }`}
                 title={shape.label}
               >
                 {shape.icon}
@@ -1371,11 +1366,11 @@ const updateDrawing = (pos: { x: number; y: number }) => {
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
-            style={{ 
-              cursor, 
-              backgroundColor: background, 
+            style={{
+              cursor,
+              backgroundColor: background,
               touchAction: 'none',
-              backgroundImage: theme === 'dark' 
+              backgroundImage: theme === 'dark'
                 ? 'radial-gradient(circle at 20px 20px, rgba(255,255,255,0.03) 1px, transparent 1px)'
                 : 'radial-gradient(circle at 20px 20px, rgba(0,0,0,0.03) 1px, transparent 1px)',
               backgroundSize: '40px 40px'
@@ -1423,7 +1418,7 @@ const updateDrawing = (pos: { x: number; y: number }) => {
                   case 'circle':
                     return <Circle key={`circle-${shape.id || idx}`} {...commonProps} radius={Math.max(shape.width, shape.height) / 2} />;
                   case 'diamond':
-                    return <Rect key={`diamond-${shape.id || idx}`} {...commonProps} transform={`rotate(45, ${shape.x + shape.width/2}, ${shape.y + shape.height/2})`} />;
+                    return <Rect key={`diamond-${shape.id || idx}`} {...commonProps} transform={`rotate(45, ${shape.x + shape.width / 2}, ${shape.y + shape.height / 2})`} />;
                   case 'triangle':
                     return <Rect key={`triangle-${shape.id || idx}`} {...commonProps} />;
                   case 'arrow': {
@@ -1493,8 +1488,8 @@ const updateDrawing = (pos: { x: number; y: number }) => {
 
           {/* ===== ZOOM CONTROLS - LARGER ===== */}
           <div className="absolute bottom-24 right-6 z-10 flex items-center gap-2 bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-2">
-            <button 
-              onClick={() => setScale(prev => Math.max(0.05, prev / 1.2))} 
+            <button
+              onClick={() => setScale(prev => Math.max(0.05, prev / 1.2))}
               className="h-10 w-10 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center transition-all"
             >
               <FaMinus className="w-4 h-4" />
@@ -1502,18 +1497,18 @@ const updateDrawing = (pos: { x: number; y: number }) => {
             <span className="text-sm font-mono min-w-[56px] text-center text-gray-700 dark:text-gray-300 font-medium">
               {Math.round(scale * 100)}%
             </span>
-            <button 
-              onClick={() => setScale(prev => Math.min(10, prev * 1.2))} 
+            <button
+              onClick={() => setScale(prev => Math.min(10, prev * 1.2))}
               className="h-10 w-10 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center transition-all"
             >
               <FaPlus className="w-4 h-4" />
             </button>
             <div className="w-px h-8 bg-gray-200 dark:bg-gray-700 mx-1" />
-            <button 
+            <button
               onClick={() => {
                 setScale(1);
                 setStagePos({ x: 0, y: 0 });
-              }} 
+              }}
               className="h-10 px-4 rounded-xl text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800 transition-all"
             >
               Reset
@@ -1522,33 +1517,32 @@ const updateDrawing = (pos: { x: number; y: number }) => {
 
           {/* ===== PAGE NAVIGATOR - MOVED UP ===== */}
           <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 px-4 py-2.5">
-            <button 
-              onClick={() => setPageIndex(Math.max(0, pageIndex - 1))} 
-              disabled={pageIndex === 0} 
+            <button
+              onClick={() => setPageIndex(Math.max(0, pageIndex - 1))}
+              disabled={pageIndex === 0}
               className="h-9 w-9 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center transition-all disabled:opacity-40"
             >
               <FaArrowLeft className="w-4 h-4" />
             </button>
-            
+
             <div className="flex items-center gap-1.5 px-2">
               {lines.map((_, idx) => (
                 <button
                   key={idx}
                   onClick={() => setPageIndex(idx)}
-                  className={`min-w-[32px] h-8 px-2 rounded-lg text-sm font-medium transition-all ${
-                    idx === pageIndex 
-                      ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/25' 
+                  className={`min-w-[32px] h-8 px-2 rounded-lg text-sm font-medium transition-all ${idx === pageIndex
+                      ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/25'
                       : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400'
-                  }`}
+                    }`}
                 >
                   {idx + 1}
                 </button>
               ))}
             </div>
 
-            <button 
-              onClick={() => setPageIndex(Math.min(lines.length - 1, pageIndex + 1))} 
-              disabled={pageIndex === lines.length - 1} 
+            <button
+              onClick={() => setPageIndex(Math.min(lines.length - 1, pageIndex + 1))}
+              disabled={pageIndex === lines.length - 1}
               className="h-9 w-9 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center transition-all disabled:opacity-40"
             >
               <FaArrowRight className="w-4 h-4" />
@@ -1556,9 +1550,9 @@ const updateDrawing = (pos: { x: number; y: number }) => {
 
             <div className="w-px h-7 bg-gray-200 dark:bg-gray-700 mx-1" />
 
-            <button 
-              onClick={addPage} 
-              disabled={finalReadOnly} 
+            <button
+              onClick={addPage}
+              disabled={finalReadOnly}
               className="h-9 w-9 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center transition-all disabled:opacity-40"
             >
               <FaPlus className="w-4 h-4" />
@@ -1588,7 +1582,7 @@ const updateDrawing = (pos: { x: number; y: number }) => {
       {/* ===== TEXT INPUT MODAL ===== */}
       {textInput.active && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm" onClick={() => setTextInput({ active: false, x: 0, y: 0, text: '', id: '' })}>
-          <motion.div 
+          <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.9, opacity: 0 }}
@@ -1611,14 +1605,14 @@ const updateDrawing = (pos: { x: number; y: number }) => {
               }}
             />
             <div className="flex gap-3 mt-4">
-              <button 
-                onClick={() => setTextInput({ active: false, x: 0, y: 0, text: '', id: '' })} 
+              <button
+                onClick={() => setTextInput({ active: false, x: 0, y: 0, text: '', id: '' })}
                 className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all text-sm font-medium"
               >
                 Cancel
               </button>
-              <button 
-                onClick={handleTextSave} 
+              <button
+                onClick={handleTextSave}
                 className="flex-1 px-4 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl hover:shadow-lg hover:shadow-blue-500/25 transition-all text-sm font-medium"
               >
                 Add Text
@@ -1631,7 +1625,7 @@ const updateDrawing = (pos: { x: number; y: number }) => {
       {/* ===== STICKY EDIT MODAL ===== */}
       {editingSticky && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm" onClick={() => setEditingSticky(null)}>
-          <motion.div 
+          <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.9, opacity: 0 }}
@@ -1654,14 +1648,14 @@ const updateDrawing = (pos: { x: number; y: number }) => {
               }}
             />
             <div className="flex gap-3 mt-4">
-              <button 
-                onClick={() => setEditingSticky(null)} 
+              <button
+                onClick={() => setEditingSticky(null)}
                 className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all text-sm font-medium"
               >
                 Cancel
               </button>
-              <button 
-                onClick={handleStickyEdit} 
+              <button
+                onClick={handleStickyEdit}
                 className="flex-1 px-4 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl hover:shadow-lg hover:shadow-blue-500/25 transition-all text-sm font-medium"
               >
                 Save Note
@@ -1674,7 +1668,7 @@ const updateDrawing = (pos: { x: number; y: number }) => {
       {/* ===== SHARE MODAL ===== */}
       {showShare && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm" onClick={() => setShowShare(false)}>
-          <motion.div 
+          <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.9, opacity: 0 }}
@@ -1698,7 +1692,7 @@ const updateDrawing = (pos: { x: number; y: number }) => {
       {/* ===== MOBILE MENU ===== */}
       {showMobileMenu && (
         <div className="fixed inset-0 bg-black/50 z-50 md:hidden" onClick={() => setShowMobileMenu(false)}>
-          <motion.div 
+          <motion.div
             initial={{ x: -320 }}
             animate={{ x: 0 }}
             exit={{ x: -320 }}
@@ -1716,11 +1710,10 @@ const updateDrawing = (pos: { x: number; y: number }) => {
                 <button
                   key={tool.mode}
                   onClick={() => { setMode(tool.mode); setShowMobileMenu(false); }}
-                  className={`p-4 rounded-2xl flex flex-col items-center gap-2 transition-all ${
-                    mode === tool.mode 
-                      ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/25' 
+                  className={`p-4 rounded-2xl flex flex-col items-center gap-2 transition-all ${mode === tool.mode
+                      ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/25'
                       : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
-                  }`}
+                    }`}
                 >
                   <div className="text-2xl">{tool.icon}</div>
                   <span className="text-xs font-medium">{tool.label}</span>

@@ -42,68 +42,68 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   /* =========================================================
      RESOLVE USER (RUN ONLY ONCE AFTER NEXTAUTH READY)
   ========================================================= */
-const resolveUser = async () => {
+  const resolveUser = async () => {
 
-  // Wait until next-auth finishes checking cookies
-  if (status === "loading") return;
+    // Wait until next-auth finishes checking cookies
+    if (status === "loading") return;
 
-  try {
+    try {
 
-    /* 1️⃣ GOOGLE LOGIN (NextAuth priority) */
-    if (status === "authenticated" && session?.user) {
-      setUser({
-        id: session.user.email!,
-        name: session.user.name,
-        email: session.user.email,
-        image: session.user.image,
-        provider: "oauth"
+      /* 1️⃣ GOOGLE LOGIN (NextAuth priority) */
+      if (status === "authenticated" && session?.user) {
+        setUser({
+          id: session.user.email!,
+          name: session.user.name,
+          email: session.user.email,
+          image: session.user.image,
+          provider: "oauth"
+        });
+
+        setLoading(false);
+        return;
+      }
+
+
+      /* 2️⃣ CUSTOM LOGIN — ONLY IF COOKIE EXISTS */
+      const hasPossibleAuthCookie =
+        document.cookie.includes("token") ||
+        document.cookie.includes("next-auth.session-token") ||
+        document.cookie.includes("__Secure-next-auth.session-token");
+
+
+      if (!hasPossibleAuthCookie) {
+        setUser(null);
+        setLoading(false);
+        return;
+      }
+
+      // Now safe to call backend
+      const res = await fetch("/api/auth/me", {
+        credentials: "include",
+        cache: "no-store"
       });
 
-      setLoading(false);
-      return;
-    }
+      if (res.ok) {
+        const data = await res.json();
+        setUser({ ...data.user, provider: "credentials" });
+      } else {
+        // 401 or expired cookie
+        setUser(null);
+      }
 
-
-    /* 2️⃣ CUSTOM LOGIN — ONLY IF COOKIE EXISTS */
-    const hasPossibleAuthCookie =
-      document.cookie.includes("token") ||
-      document.cookie.includes("next-auth.session-token") ||
-      document.cookie.includes("__Secure-next-auth.session-token");
-
-
-    if (!hasPossibleAuthCookie) {
-      setUser(null);
-      setLoading(false);
-      return;
-    }
-
-    // Now safe to call backend
-    const res = await fetch("/api/auth/me", {
-      credentials: "include",
-      cache: "no-store"
-    });
-
-    if (res.ok) {
-      const data = await res.json();
-      setUser({ ...data.user, provider: "credentials" });
-    } else {
-      // 401 or expired cookie
+    } catch (err) {
+      console.error("Auth resolve failed:", err);
       setUser(null);
     }
 
-  } catch (err) {
-    console.error("Auth resolve failed:", err);
-    setUser(null);
-  }
-
-  setLoading(false);
-};
+    setLoading(false);
+  };
 
 
   /* RUN ONLY ONCE */
   useEffect(() => {
-  resolveUser();
-}, [status]);
+    resolveUser();
+  }, [status]);
 
 
   /* =========================================================
@@ -167,7 +167,7 @@ const resolveUser = async () => {
     try {
       await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
       await nextAuthSignOut({ redirect: false });
-    } catch {}
+    } catch { }
 
     setUser(null);
     router.replace("/");
