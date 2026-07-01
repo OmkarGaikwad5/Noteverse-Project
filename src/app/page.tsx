@@ -158,9 +158,9 @@ export default function Home() {
   ];
 
   const stats = [
-    { value: "100K+", label: "Active Users", icon: <FaUsers className="text-blue-500" /> },
-    { value: "1M+", label: "Notes Created", icon: <FaBook className="text-purple-500" /> },
-    { value: "50+", label: "Countries", icon: <FaGlobe className="text-green-500" /> },
+    { value: "50+", label: "Active Users", icon: <FaUsers className="text-blue-500" /> },
+    { value: "100+", label: "Notes Created", icon: <FaBook className="text-purple-500" /> },
+    { value: "1", label: "Country", icon: <FaGlobe className="text-green-500" /> },
     { value: "99.9%", label: "Uptime", icon: <FaCloud className="text-indigo-500" /> }
   ];
 
@@ -222,7 +222,7 @@ export default function Home() {
               transition={{ duration: 0.5, delay: 0.1 }}
               className="hidden md:flex items-center space-x-8"
             >
-              {['Features', 'Testimonials', 'Pricing'].map((item, i) => (
+              {['Features'].map((item, i) => (
                 <Link
                   key={item}
                   href={`#${item.toLowerCase()}`}
@@ -350,31 +350,7 @@ export default function Home() {
                 </Link>
               </motion.div>
 
-              {/* Social Proof */}
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={heroInView ? { opacity: 1 } : {}}
-                transition={{ duration: 0.6, delay: 0.6 }}
-                className="mt-6 sm:mt-8 flex flex-wrap items-center justify-center lg:justify-start gap-4 sm:gap-6"
-              >
-                <div className="flex -space-x-2">
-                  {[1, 2, 3, 4].map((i) => (
-                    <div key={i} className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 border-2 border-white flex items-center justify-center text-white text-xs font-bold">
-                      U{i}
-                    </div>
-                  ))}
-                </div>
-                <div className="text-left">
-                  <div className="flex items-center gap-1">
-                    {[1, 2, 3, 4, 5].map((i) => (
-                      <FaStar key={i} className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-400 fill-current" />
-                    ))}
-                  </div>
-                  <p className="text-xs sm:text-sm text-gray-600 mt-1">
-                    <span className="font-semibold">10,000+</span> creators trust us
-                  </p>
-                </div>
-              </motion.div>
+             
             </motion.div>
 
             {/* Right Content - Hero Image - Responsive with height constraints */}
@@ -601,106 +577,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Testimonials - Modern Carousel for Mobile */}
-      <section id="testimonials" ref={testimonialsRef} className="py-12 sm:py-16 lg:py-20 px-4 sm:px-6 lg:px-8 bg-white">
-        <div className="max-w-7xl mx-auto">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={testimonialsInView ? { opacity: 1, y: 0 } : {}}
-            transition={{ duration: 0.6 }}
-            className="text-center mb-8 sm:mb-12 lg:mb-16"
-          >
-            <span className="inline-block px-3 py-1 sm:px-4 sm:py-2 rounded-full bg-gradient-to-r from-yellow-50 to-orange-50 text-orange-600 text-xs sm:text-sm font-medium mb-3 sm:mb-4 border border-yellow-200">
-              <FaStar className="inline mr-1 w-3 h-3 sm:w-4 sm:h-4" />
-              Trusted by Creators
-            </span>
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl xl:text-5xl font-bold mb-3 sm:mb-4">
-              Loved by Thinkers
-              <span className="block mt-1 sm:mt-2 bg-gradient-to-r from-orange-500 to-red-500 bg-clip-text text-transparent">
-                Worldwide
-              </span>
-            </h2>
-          </motion.div>
-
-          {/* Desktop Grid - Hidden on mobile */}
-          <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
-            {testimonials.map((testimonial, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={testimonialsInView ? { opacity: 1, scale: 1 } : {}}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
-                whileHover={{ y: -5, scale: 1.02 }}
-                className="bg-gradient-to-br from-gray-50 to-white p-4 sm:p-5 lg:p-6 rounded-xl sm:rounded-2xl border border-gray-200 hover:shadow-xl transition-all duration-300"
-              >
-                <div className="flex mb-2 sm:mb-3">
-                  {[...Array(testimonial.rating)].map((_, i) => (
-                    <FaStar key={i} className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-yellow-400 fill-current" />
-                  ))}
-                </div>
-                <p className="text-gray-600 mb-3 sm:mb-4 text-xs sm:text-sm leading-relaxed">"{testimonial.content}"</p>
-                <div className="flex items-center">
-                  <div className="w-8 h-8 sm:w-9 sm:h-9 lg:w-10 lg:h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold text-xs sm:text-sm mr-2 sm:mr-3">
-                    {testimonial.avatar}
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-gray-800 text-xs sm:text-sm">{testimonial.name}</h4>
-                    <p className="text-gray-500 text-[10px] sm:text-xs">{testimonial.role}</p>
-                    <p className="text-gray-400 text-[10px] mt-0.5">{testimonial.company}</p>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-
-          {/* Mobile Carousel */}
-          <div className="md:hidden">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={activeTestimonial}
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.3 }}
-                className="bg-gradient-to-br from-gray-50 to-white p-5 sm:p-6 rounded-xl border border-gray-200 shadow-lg"
-              >
-                <div className="flex mb-2 sm:mb-3">
-                  {[...Array(testimonials[activeTestimonial].rating)].map((_, i) => (
-                    <FaStar key={i} className="w-4 h-4 text-yellow-400 fill-current" />
-                  ))}
-                </div>
-                <p className="text-gray-600 mb-3 sm:mb-4 text-sm sm:text-base leading-relaxed">
-                  "{testimonials[activeTestimonial].content}"
-                </p>
-                <div className="flex items-center">
-                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold text-sm sm:text-base mr-3">
-                    {testimonials[activeTestimonial].avatar}
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-gray-800 text-sm sm:text-base">{testimonials[activeTestimonial].name}</h4>
-                    <p className="text-gray-500 text-xs sm:text-sm">{testimonials[activeTestimonial].role}</p>
-                    <p className="text-gray-400 text-[10px] sm:text-xs mt-0.5">{testimonials[activeTestimonial].company}</p>
-                  </div>
-                </div>
-              </motion.div>
-            </AnimatePresence>
-
-            {/* Carousel Indicators */}
-            <div className="flex justify-center gap-2 mt-4 sm:mt-6">
-              {testimonials.map((_, index) => (
-                <button
-                  key={index}
-                  onClick={() => setActiveTestimonial(index)}
-                  className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full transition-all duration-300 ${index === activeTestimonial
-                      ? 'w-4 sm:w-6 bg-gradient-to-r from-blue-600 to-purple-600'
-                      : 'bg-gray-300'
-                    }`}
-                />
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
+      
 
       {/* CTA Section - Modern & Responsive */}
       <section className="py-12 sm:py-16 lg:py-20 px-4 sm:px-6 lg:px-8">
@@ -753,87 +630,14 @@ export default function Home() {
               </div>
 
               <p className="text-[10px] sm:text-xs lg:text-sm text-blue-200 mt-4 sm:mt-5 lg:mt-6">
-                ✨ No credit card required • 14-day free trial • Cancel anytime
+                ✨ 14-day free trial • Cancel anytime
               </p>
             </div>
           </motion.div>
         </div>
       </section>
 
-      {/* Footer - Modern & Clean */}
-      <footer className="bg-gray-900 text-white py-10 sm:py-12 lg:py-16 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 lg:gap-12">
-            {/* Brand */}
-            <div className="col-span-1 lg:col-span-1">
-              <div className="flex items-center space-x-2 mb-3 sm:mb-4">
-                <div className="w-8 h-8 sm:w-9 sm:h-9 lg:w-10 lg:h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center shadow-lg">
-                  <span className="text-white font-bold text-sm sm:text-base lg:text-lg">NV</span>
-                </div>
-                <span className="text-xl sm:text-2xl font-bold">
-                  <span className="bg-gradient-to-r from-blue-400 to-blue-300 bg-clip-text text-transparent">Note</span>
-                  <span className="bg-gradient-to-r from-purple-400 to-purple-300 bg-clip-text text-transparent">Verse</span>
-                </span>
-              </div>
-              <p className="text-gray-400 text-xs sm:text-sm leading-relaxed mb-4 sm:mb-5 lg:mb-6 max-w-md">
-                The all-in-one note-taking universe for thinkers, creators, and visual minds.
-                Capture ideas, bring them to life.
-              </p>
-              <div className="flex items-center gap-3 sm:gap-4">
-                {[FaTwitter, FaGithub, FaDiscord, FaGoogle].map((Icon, i) => (
-                  <Link key={i} href="#" className="text-gray-400 hover:text-white transition-colors">
-                    <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
-                  </Link>
-                ))}
-              </div>
-            </div>
-
-            {/* Links */}
-            <div className="col-span-1 lg:col-span-3">
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
-                <div>
-                  <h4 className="font-bold mb-3 sm:mb-4 text-xs sm:text-sm">Product</h4>
-                  <ul className="space-y-1.5 sm:space-y-2 lg:space-y-3 text-xs sm:text-sm text-gray-400">
-                    <li><Link href="#features" className="hover:text-white transition-colors">Features</Link></li>
-                    <li><Link href="/pricing" className="hover:text-white transition-colors">Pricing</Link></li>
-                    <li><Link href="/integrations" className="hover:text-white transition-colors">Integrations</Link></li>
-                    <li><Link href="/changelog" className="hover:text-white transition-colors">Changelog</Link></li>
-                  </ul>
-                </div>
-
-                <div>
-                  <h4 className="font-bold mb-3 sm:mb-4 text-xs sm:text-sm">Company</h4>
-                  <ul className="space-y-1.5 sm:space-y-2 lg:space-y-3 text-xs sm:text-sm text-gray-400">
-                    <li><Link href="/about" className="hover:text-white transition-colors">About</Link></li>
-                    <li><Link href="/blog" className="hover:text-white transition-colors">Blog</Link></li>
-                    <li><Link href="/careers" className="hover:text-white transition-colors">Careers</Link></li>
-                    <li><Link href="/contact" className="hover:text-white transition-colors">Contact</Link></li>
-                  </ul>
-                </div>
-
-                <div>
-                  <h4 className="font-bold mb-3 sm:mb-4 text-xs sm:text-sm">Legal</h4>
-                  <ul className="space-y-1.5 sm:space-y-2 lg:space-y-3 text-xs sm:text-sm text-gray-400">
-                    <li><Link href="/privacy" className="hover:text-white transition-colors">Privacy</Link></li>
-                    <li><Link href="/terms" className="hover:text-white transition-colors">Terms</Link></li>
-                    <li><Link href="/security" className="hover:text-white transition-colors">Security</Link></li>
-                    <li><Link href="/cookies" className="hover:text-white transition-colors">Cookies</Link></li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="border-t border-gray-800 mt-8 sm:mt-10 lg:mt-12 pt-5 sm:pt-6 lg:pt-8 text-center">
-            <p className="text-xs sm:text-sm text-gray-400">
-              © {new Date().getFullYear()} NoteVerse. All rights reserved.
-            </p>
-            <p className="text-[10px] sm:text-xs text-gray-500 mt-1.5 sm:mt-2 flex items-center justify-center gap-1">
-              Made with <FaHeart className="text-red-500 w-2.5 h-2.5 sm:w-3 sm:h-3" /> for note-takers everywhere
-            </p>
-          </div>
-        </div>
-      </footer>
+      
 
       {/* Global Styles for Animations */}
       <style jsx global>{`
